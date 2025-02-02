@@ -1,0 +1,9 @@
+host: 0.0.0.0
+port: 3000
+log_level: info
+database:
+  host: "127.0.0.1"
+  port: 5432
+  username: "feemanager"
+  password: "feemanager"
+  dbname: "feemanager"

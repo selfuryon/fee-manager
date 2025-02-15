@@ -38,7 +38,7 @@ SELECT
     config->>'fee_recipient' AS fee_recipient,
     config->>'gas_limit' AS gas_limit,
     config->>'min_value' AS min_value,
-    (config->>'grace')::integer AS grace,
+    (config->>'grace')::smallint AS grace,
     config->'relays' AS relays
 FROM 
     execution_configs
@@ -53,7 +53,7 @@ SELECT
     config->>'fee_recipient' AS fee_recipient,
     config->>'gas_limit' AS gas_limit,
     config->>'min_value' AS min_value,
-    (config->>'grace')::integer AS grace,
+    (config->>'grace')::smallint AS grace,
     (config->>'reset_relays')::boolean AS reset_relays,
     config->'relays' AS relays
 FROM 

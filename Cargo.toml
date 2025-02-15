@@ -9,12 +9,13 @@ name = "fee-manager"
 
 [dependencies]
 axum = "0.8"
+oasgen = { version = "0.24", features = ["axum","swagger-ui"] }
 
 hex = { version = "0.4", features = ["serde"] }
 config = "0.15"
 anyhow = "1.0"
 
-sqlx = { version = "0.8", features = ["postgres"] }
+sqlx = { version = "0.8", features = ["postgres", "runtime-tokio"] }
 
 serde = {version = "1.0", features = ["derive"] }
 serde_derive = "1.0"

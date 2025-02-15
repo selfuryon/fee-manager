@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT config_id, fee_recipient, gas_limit, min_value, grace,relays\n        FROM default_configs\n        WHERE config_id = $1 LIMIT 1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "config_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "fee_recipient",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "gas_limit",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "min_value",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "grace",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 5,
+        "name": "relays",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "e7d7daa1f9913b1dc863dac975aabe28c42d6539fb3361e2ddf6d68f69bcb06d"
+}

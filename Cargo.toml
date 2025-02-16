@@ -9,7 +9,9 @@ name = "fee-manager"
 
 [dependencies]
 axum = "0.8"
-oasgen = { version = "0.24", features = ["axum","swagger-ui"] }
+utoipa = { version = "5", features = ["axum_extras"] }
+utoipa-swagger-ui = { version = "9", features = ["axum"] }
+utoipa-axum = "0.2"
 
 hex = { version = "0.4", features = ["serde"] }
 config = "0.15"

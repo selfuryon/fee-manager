@@ -8,6 +8,7 @@ mod config;
 mod errors;
 mod handlers;
 mod models;
+mod openapi;
 
 use crate::handlers::create_router;
 

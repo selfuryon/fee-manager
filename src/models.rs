@@ -1,6 +1,7 @@
 // models.rs
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use utoipa::ToSchema;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct DbDefaultConfig {
@@ -20,7 +21,7 @@ pub struct DbRelayConfig {
     pub min_value: Option<String>,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, ToSchema)]
 pub struct DefaultConfigResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fee_recipient: Option<String>,
@@ -34,7 +35,7 @@ pub struct DefaultConfigResponse {
     pub relays: Option<HashMap<String, RelayConfigResponse>>,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, ToSchema)]
 pub struct RelayConfigResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub public_key: Option<String>,

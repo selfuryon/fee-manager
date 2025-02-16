@@ -17,7 +17,43 @@ pub struct DefaultConfig {
     config_id: String,
     config: serde_json::Value, // JSONB field for the config
 }
-
+#[utoipa::path(
+    get,
+    path = "/api/v1/configs/default/{config_id}",
+    params(
+        ("config_id" = String, Path, description = "Default configuration identifier")
+    ),
+    responses(
+        (status = 200, description = "Configuration retrieved successfully", body = DefaultConfigResponse, example = json!({
+            "fee_recipient": "0x1234567890abcdef1234567890abcdef12345678",
+            "gas_limit": "30000000",
+            "min_value": "0.1",
+            "grace": 30,
+            "relays": {
+                "https://relay1.com/": {
+                    "public_key": "0xabcdef1234567890abcdef1234567890abcdef12",
+                    "fee_recipient": "0x1234567890abcdef1234567890abcdef12345678",
+                    "gas_limit": "30000000",
+                    "min_value": "0.2"
+                }
+            }
+        })),
+        (status = 404, description = "Configuration not found", body = ErrorResponse, example = json!({
+            "error": {
+                "code": "NOT_FOUND",
+                "message": "Default config test123 not found"
+            }
+        })),
+        (status = 500, description = "Internal server error", body = ErrorResponse, example = json!({
+            "error": {
+                "code": "INTERNAL_ERROR",
+                "message": "Failed to fetch default config test123"
+            }
+        }))
+    ),
+    tag = "Default config"
+)]
+#[tracing::instrument(skip(state))]
 pub async fn get_default_config(
     State(state): State<Arc<AppState>>,
     Path(config_id): Path<String>,

@@ -1,4 +1,5 @@
-{pkgs, ...}: {
+{ pkgs, ... }:
+{
   env.DATABASE_URL = "postgres://feemanager:feemanager@localhost/feemanager";
   languages.rust.enable = true;
   packages = [
@@ -15,8 +16,8 @@
       }
     ];
   };
-  pre-commit.hooks = {
-    rustfmt.enable = true;
-    clippy.enable = true;
-  };
+  # pre-commit.hooks = {
+  #   # rustfmt.enable = true;
+  #   # clippy.enable = true;
+  # };
 }

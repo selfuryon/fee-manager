@@ -11,11 +11,10 @@ name = "fee-manager"
 axum = "0.8"
 utoipa = { version = "5", features = ["axum_extras"] }
 utoipa-swagger-ui = { version = "9", features = ["axum"] }
-utoipa-axum = "0.2"
 
 hex = { version = "0.4", features = ["serde"] }
 config = "0.15"
-anyhow = "1.0"
+thiserror = "2"
 
 sqlx = { version = "0.8", features = ["postgres", "runtime-tokio"] }
 

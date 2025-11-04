@@ -10,6 +10,7 @@ use utoipa::OpenApi;
     ),
     paths(
         crate::handlers::default_config::get_default_config,
+        crate::handlers::default_config::create_or_update_default_config,
         crate::handlers::get_ready,
     ),
     tags(

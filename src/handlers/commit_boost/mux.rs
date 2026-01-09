@@ -1,4 +1,5 @@
 // handlers/commit_boost/mux.rs - Mux config CRUD handlers
+use crate::addresses::BlsPubkey;
 use crate::errors::ApiError;
 use crate::schema::{
     CreateMuxConfigRequest, MuxConfigListItem, MuxConfigResponse, MuxKeysRequest, MuxKeysResponse,
@@ -39,7 +40,7 @@ fn default_limit() -> i64 {
         ("name" = String, Path, description = "Mux config name")
     ),
     responses(
-        (status = 200, description = "List of validator public keys", body = Vec<String>),
+        (status = 200, description = "List of validator public keys", body = Vec<BlsPubkey>),
         (status = 404, description = "Mux config not found")
     ),
     tag = "Commit-Boost - Public"
@@ -48,7 +49,7 @@ fn default_limit() -> i64 {
 pub async fn get_mux_keys_public(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
-) -> Result<Json<Vec<String>>, ApiError> {
+) -> Result<Json<Vec<BlsPubkey>>, ApiError> {
     info!("Getting mux keys (public): {}", name);
 
     // Check if config exists
@@ -66,7 +67,7 @@ pub async fn get_mux_keys_public(
         )));
     }
 
-    let keys = sqlx::query_scalar::<_, String>(
+    let keys = sqlx::query_scalar::<_, BlsPubkey>(
         "SELECT public_key FROM commit_boost_mux_keys WHERE mux_name = $1 ORDER BY id",
     )
     .bind(&name)
@@ -163,7 +164,7 @@ pub async fn get_mux_config(
     .await?
     .ok_or_else(|| ApiError::NotFound(format!("Mux config '{}' not found", name)))?;
 
-    let keys = sqlx::query_scalar::<_, String>(
+    let keys = sqlx::query_scalar::<_, BlsPubkey>(
         "SELECT public_key FROM commit_boost_mux_keys WHERE mux_name = $1 ORDER BY id",
     )
     .bind(&name)

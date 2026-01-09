@@ -4,6 +4,7 @@ use sqlx::{postgres::PgPoolOptions, PgPool};
 use std::sync::Arc;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+mod addresses;
 mod config;
 mod errors;
 mod handlers;

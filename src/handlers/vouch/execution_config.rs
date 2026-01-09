@@ -106,7 +106,7 @@ pub async fn get_execution_config(
                 .collect();
 
             proposers.push(ProposerEntry {
-                proposer: proposer.public_key,
+                proposer: proposer.public_key.to_string(),
                 fee_recipient: proposer.fee_recipient,
                 gas_limit: proposer.gas_limit,
                 min_value: proposer.min_value,

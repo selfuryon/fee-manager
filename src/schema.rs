@@ -1,4 +1,5 @@
 // schema.rs - API request/response types
+use crate::addresses::{BlsPubkey, EthAddress};
 use crate::models::{
     VouchDefaultConfig, VouchDefaultRelay, VouchProposer, VouchProposerPattern,
     VouchProposerPatternRelay, VouchProposerRelay,
@@ -14,9 +15,9 @@ use utoipa::ToSchema;
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct RelayConfig {
-    pub public_key: String,
+    pub public_key: BlsPubkey,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub fee_recipient: Option<String>,
+    pub fee_recipient: Option<EthAddress>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gas_limit: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -25,9 +26,9 @@ pub struct RelayConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ProposerRelayConfig {
-    pub public_key: String,
+    pub public_key: BlsPubkey,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub fee_recipient: Option<String>,
+    pub fee_recipient: Option<EthAddress>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gas_limit: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -53,7 +54,7 @@ pub struct PaginatedResponse<T> {
 pub struct DefaultConfigResponse {
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub fee_recipient: Option<String>,
+    pub fee_recipient: Option<EthAddress>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gas_limit: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -69,7 +70,7 @@ pub struct DefaultConfigResponse {
 pub struct DefaultConfigListItem {
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub fee_recipient: Option<String>,
+    pub fee_recipient: Option<EthAddress>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gas_limit: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -83,7 +84,7 @@ pub struct DefaultConfigListItem {
 pub struct CreateDefaultConfigRequest {
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub fee_recipient: Option<String>,
+    pub fee_recipient: Option<EthAddress>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gas_limit: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -97,7 +98,7 @@ pub struct CreateDefaultConfigRequest {
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct UpdateDefaultConfigRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub fee_recipient: Option<String>,
+    pub fee_recipient: Option<EthAddress>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gas_limit: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -118,9 +119,9 @@ fn default_true() -> bool {
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ProposerResponse {
-    pub public_key: String,
+    pub public_key: BlsPubkey,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub fee_recipient: Option<String>,
+    pub fee_recipient: Option<EthAddress>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gas_limit: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -134,9 +135,9 @@ pub struct ProposerResponse {
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ProposerListItem {
-    pub public_key: String,
+    pub public_key: BlsPubkey,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub fee_recipient: Option<String>,
+    pub fee_recipient: Option<EthAddress>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gas_limit: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -149,7 +150,7 @@ pub struct ProposerListItem {
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct CreateOrUpdateProposerRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub fee_recipient: Option<String>,
+    pub fee_recipient: Option<EthAddress>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gas_limit: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -170,7 +171,7 @@ pub struct ProposerPatternResponse {
     pub pattern: String,
     pub tags: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub fee_recipient: Option<String>,
+    pub fee_recipient: Option<EthAddress>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gas_limit: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -188,7 +189,7 @@ pub struct ProposerPatternListItem {
     pub pattern: String,
     pub tags: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub fee_recipient: Option<String>,
+    pub fee_recipient: Option<EthAddress>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gas_limit: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -205,7 +206,7 @@ pub struct CreateProposerPatternRequest {
     #[serde(default)]
     pub tags: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub fee_recipient: Option<String>,
+    pub fee_recipient: Option<EthAddress>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gas_limit: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -223,7 +224,7 @@ pub struct UpdateProposerPatternRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tags: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub fee_recipient: Option<String>,
+    pub fee_recipient: Option<EthAddress>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gas_limit: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -240,14 +241,14 @@ pub struct UpdateProposerPatternRequest {
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ExecutionConfigRequest {
-    pub keys: Vec<String>,
+    pub keys: Vec<BlsPubkey>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ExecutionConfigResponse {
     pub version: u8,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub fee_recipient: Option<String>,
+    pub fee_recipient: Option<EthAddress>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gas_limit: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -258,11 +259,13 @@ pub struct ExecutionConfigResponse {
     pub proposers: Option<Vec<ProposerEntry>>,
 }
 
+/// Entry in proposers array - can be either a specific validator key or a regex pattern
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ProposerEntry {
+    /// Validator public key (BlsPubkey) or regex pattern (String)
     pub proposer: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub fee_recipient: Option<String>,
+    pub fee_recipient: Option<EthAddress>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gas_limit: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -280,7 +283,7 @@ pub struct ProposerEntry {
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct MuxConfigResponse {
     pub name: String,
-    pub keys: Vec<String>,
+    pub keys: Vec<BlsPubkey>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -297,18 +300,18 @@ pub struct MuxConfigListItem {
 pub struct CreateMuxConfigRequest {
     pub name: String,
     #[serde(default)]
-    pub keys: Vec<String>,
+    pub keys: Vec<BlsPubkey>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct UpdateMuxConfigRequest {
     #[serde(default)]
-    pub keys: Vec<String>,
+    pub keys: Vec<BlsPubkey>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct MuxKeysRequest {
-    pub keys: Vec<String>,
+    pub keys: Vec<BlsPubkey>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]

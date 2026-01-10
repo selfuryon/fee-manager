@@ -76,6 +76,8 @@ pub struct DefaultConfigListItem {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub min_value: Option<String>,
     pub active: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub relays: Option<HashMap<String, RelayConfig>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -143,6 +145,8 @@ pub struct ProposerListItem {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub min_value: Option<String>,
     pub reset_relays: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub relays: Option<HashMap<String, ProposerRelayConfig>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -333,6 +337,7 @@ impl From<VouchDefaultConfig> for DefaultConfigListItem {
             gas_limit: config.gas_limit,
             min_value: config.min_value,
             active: config.active,
+            relays: None, // Populated separately by handler
             created_at: config.created_at,
             updated_at: config.updated_at,
         }
@@ -347,6 +352,7 @@ impl From<VouchProposer> for ProposerListItem {
             gas_limit: proposer.gas_limit,
             min_value: proposer.min_value,
             reset_relays: proposer.reset_relays,
+            relays: None, // Populated separately by handler
             created_at: proposer.created_at,
             updated_at: proposer.updated_at,
         }

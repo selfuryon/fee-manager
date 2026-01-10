@@ -94,7 +94,44 @@ pub async fn list_default_configs(
         .fetch_all(&state.pool)
         .await?;
 
-    let data: Vec<DefaultConfigListItem> = configs.into_iter().map(Into::into).collect();
+    // Fetch relays for all configs in the result
+    let config_names: Vec<&str> = configs.iter().map(|c| c.name.as_str()).collect();
+    let relays_map = if !config_names.is_empty() {
+        let placeholders: Vec<String> = config_names.iter().enumerate()
+            .map(|(i, _)| format!("${}", i + 1))
+            .collect();
+        let relays_sql = format!(
+            "SELECT id, config_name, url, public_key, fee_recipient, gas_limit, min_value
+             FROM vouch_default_relays WHERE config_name IN ({})",
+            placeholders.join(", ")
+        );
+        let mut query = sqlx::query_as::<_, crate::models::VouchDefaultRelay>(&relays_sql);
+        for name in &config_names {
+            query = query.bind(*name);
+        }
+        let all_relays = query.fetch_all(&state.pool).await?;
+
+        // Group relays by config_name
+        let mut map: HashMap<String, HashMap<String, RelayConfig>> = HashMap::new();
+        for relay in all_relays {
+            map.entry(relay.config_name.clone())
+                .or_default()
+                .insert(relay.url.clone(), relay.into());
+        }
+        map
+    } else {
+        HashMap::new()
+    };
+
+    let data: Vec<DefaultConfigListItem> = configs
+        .into_iter()
+        .map(|c| {
+            let relays = relays_map.get(&c.name).cloned();
+            let mut item: DefaultConfigListItem = c.into();
+            item.relays = relays;
+            item
+        })
+        .collect();
 
     Ok(Json(PaginatedResponse {
         data,

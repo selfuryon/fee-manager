@@ -97,7 +97,44 @@ pub async fn list_proposers(
         .fetch_all(&state.pool)
         .await?;
 
-    let data: Vec<ProposerListItem> = proposers.into_iter().map(Into::into).collect();
+    // Fetch relays for all proposers in the result
+    let pubkeys: Vec<String> = proposers.iter().map(|p| p.public_key.to_string()).collect();
+    let relays_map = if !pubkeys.is_empty() {
+        let placeholders: Vec<String> = pubkeys.iter().enumerate()
+            .map(|(i, _)| format!("${}", i + 1))
+            .collect();
+        let relays_sql = format!(
+            "SELECT id, proposer_public_key, url, public_key, fee_recipient, gas_limit, min_value, disabled
+             FROM vouch_proposer_relays WHERE proposer_public_key IN ({})",
+            placeholders.join(", ")
+        );
+        let mut query = sqlx::query_as::<_, crate::models::VouchProposerRelay>(&relays_sql);
+        for pk in &pubkeys {
+            query = query.bind(pk);
+        }
+        let all_relays = query.fetch_all(&state.pool).await?;
+
+        // Group relays by proposer_public_key
+        let mut map: HashMap<String, HashMap<String, ProposerRelayConfig>> = HashMap::new();
+        for relay in all_relays {
+            map.entry(relay.proposer_public_key.to_string())
+                .or_default()
+                .insert(relay.url.clone(), relay.into());
+        }
+        map
+    } else {
+        HashMap::new()
+    };
+
+    let data: Vec<ProposerListItem> = proposers
+        .into_iter()
+        .map(|p| {
+            let relays = relays_map.get(&p.public_key.to_string()).cloned();
+            let mut item: ProposerListItem = p.into();
+            item.relays = relays;
+            item
+        })
+        .collect();
 
     Ok(Json(PaginatedResponse {
         data,

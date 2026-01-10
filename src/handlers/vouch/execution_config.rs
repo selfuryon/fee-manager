@@ -1,6 +1,7 @@
 // handlers/vouch/execution_config.rs - Public execution config endpoint
+use crate::addresses::BlsPubkey;
 use crate::errors::ApiError;
-use crate::schema::{ExecutionConfigRequest, ExecutionConfigResponse, ProposerEntry, RelayConfig};
+use crate::schema::{ExecutionConfigResponse, ProposerEntry, RelayConfig};
 use crate::AppState;
 use axum::{
     extract::{Path, Query, State},
@@ -23,7 +24,7 @@ pub struct ExecutionConfigQuery {
         ("config" = String, Path, description = "Default config name"),
         ("tags" = Option<String>, Query, description = "Comma-separated list of tags")
     ),
-    request_body = ExecutionConfigRequest,
+    request_body = Vec<BlsPubkey>,
     responses(
         (status = 200, description = "Execution configuration", body = ExecutionConfigResponse),
         (status = 404, description = "Config not found")
@@ -35,13 +36,13 @@ pub async fn get_execution_config(
     State(state): State<Arc<AppState>>,
     Path(config_name): Path<String>,
     Query(query): Query<ExecutionConfigQuery>,
-    Json(req): Json<ExecutionConfigRequest>,
+    Json(keys): Json<Vec<BlsPubkey>>,
 ) -> Result<Json<ExecutionConfigResponse>, ApiError> {
     info!(
         "Getting execution config: {} with tags: {:?}, keys: {}",
         config_name,
         query.tags,
-        req.keys.len()
+        keys.len()
     );
 
     // 1. Load default config
@@ -71,12 +72,12 @@ pub async fn get_execution_config(
     // 3. Load proposer-specific configs for requested keys
     let mut proposers: Vec<ProposerEntry> = Vec::new();
 
-    if !req.keys.is_empty() {
+    if !keys.is_empty() {
         let proposer_configs = sqlx::query_as::<_, crate::models::VouchProposer>(
             "SELECT public_key, fee_recipient, gas_limit, min_value, reset_relays, created_at, updated_at
              FROM vouch_proposers WHERE public_key = ANY($1)",
         )
-        .bind(&req.keys)
+        .bind(&keys)
         .fetch_all(&state.pool)
         .await?;
 

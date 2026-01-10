@@ -98,9 +98,7 @@ async fn test_get_execution_config_basic() {
     let response = app
         .client()
         .post(&format!("{}/vouch/v2/execution-config/{}", app.address, config_name))
-        .json(&json!({
-            "keys": []
-        }))
+        .json(&json!([]))
         .send()
         .await
         .expect("Failed to send request");
@@ -124,9 +122,7 @@ async fn test_get_execution_config_not_found() {
     let response = app
         .client()
         .post(&format!("{}/vouch/v2/execution-config/{}", app.address, config_name))
-        .json(&json!({
-            "keys": []
-        }))
+        .json(&json!([]))
         .send()
         .await
         .expect("Failed to send request");
@@ -155,9 +151,7 @@ async fn test_get_execution_config_inactive() {
     let response = app
         .client()
         .post(&format!("{}/vouch/v2/execution-config/{}", app.address, config_name))
-        .json(&json!({
-            "keys": []
-        }))
+        .json(&json!([]))
         .send()
         .await
         .expect("Failed to send request");
@@ -210,9 +204,7 @@ async fn test_get_execution_config_with_proposer_keys() {
     let response = app
         .client()
         .post(&format!("{}/vouch/v2/execution-config/{}", app.address, config_name))
-        .json(&json!({
-            "keys": [pubkey]
-        }))
+        .json(&json!([pubkey]))
         .send()
         .await
         .expect("Failed to send request");
@@ -259,9 +251,7 @@ async fn test_get_execution_config_unknown_keys() {
     let response = app
         .client()
         .post(&format!("{}/vouch/v2/execution-config/{}", app.address, config_name))
-        .json(&json!({
-            "keys": [unknown_key]
-        }))
+        .json(&json!([unknown_key]))
         .send()
         .await
         .expect("Failed to send request");
@@ -326,9 +316,7 @@ async fn test_get_execution_config_with_tags() {
     let response = app
         .client()
         .post(&format!("{}/vouch/v2/execution-config/{}?tags=lido", app.address, config_name))
-        .json(&json!({
-            "keys": []
-        }))
+        .json(&json!([]))
         .send()
         .await
         .expect("Failed to send request");
@@ -391,9 +379,7 @@ async fn test_get_execution_config_multiple_proposers() {
     let response = app
         .client()
         .post(&format!("{}/vouch/v2/execution-config/{}", app.address, config_name))
-        .json(&json!({
-            "keys": [pubkey1.clone(), pubkey2.clone(), pubkey3.clone()]
-        }))
+        .json(&json!([pubkey1.clone(), pubkey2.clone(), pubkey3.clone()]))
         .send()
         .await
         .expect("Failed to send request");

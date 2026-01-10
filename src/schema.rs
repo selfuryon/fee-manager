@@ -244,11 +244,6 @@ pub struct UpdateProposerPatternRequest {
 // ============================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct ExecutionConfigRequest {
-    pub keys: Vec<BlsPubkey>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ExecutionConfigResponse {
     pub version: u8,
     #[serde(skip_serializing_if = "Option::is_none")]

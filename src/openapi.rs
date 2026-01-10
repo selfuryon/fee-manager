@@ -73,7 +73,6 @@ use utoipa::OpenApi;
             crate::schema::CreateProposerPatternRequest,
             crate::schema::UpdateProposerPatternRequest,
             // Vouch - Execution Config
-            crate::schema::ExecutionConfigRequest,
             crate::schema::ExecutionConfigResponse,
             crate::schema::ProposerEntry,
             // Commit-Boost - Mux

@@ -1,31 +1,8 @@
 // main.rs
-use config::AppConfig;
-use sqlx::{postgres::PgPoolOptions, PgPool};
+use fee_manager::{config, create_router, run_migrations, AppState};
+use sqlx::postgres::PgPoolOptions;
 use std::sync::Arc;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-
-mod addresses;
-mod config;
-mod errors;
-mod handlers;
-mod models;
-mod openapi;
-mod schema;
-
-use crate::handlers::create_router;
-
-#[derive(Debug)]
-pub struct AppState {
-    pub pool: PgPool,
-    pub config: AppConfig,
-}
-
-async fn run_migrations(pool: &sqlx::PgPool) -> Result<(), sqlx::Error> {
-    sqlx::migrate!("./migrations").run(pool).await?;
-
-    tracing::info!("Migrations completed successfully");
-    Ok(())
-}
 
 #[tokio::main]
 async fn main() {

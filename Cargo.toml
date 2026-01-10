@@ -3,6 +3,10 @@ name = "fee-manager"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+path = "src/lib.rs"
+name = "fee_manager"
+
 [[bin]]
 path = "src/main.rs"
 name = "fee-manager"
@@ -32,4 +36,5 @@ url = { version= "2.5", features = ["serde"] }
 rust_decimal = "1.39"
 
 [dev-dependencies]
-reqwest = "0.13"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+serial_test = "3"

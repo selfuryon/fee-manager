@@ -52,23 +52,18 @@ pub async fn list_proposers(
 
     // Build dynamic query based on filters
     let mut conditions = Vec::new();
-    let mut params: Vec<String> = Vec::new();
 
     if let Some(ref pk) = filters.public_key {
-        params.push(format!("{}%", pk));
-        conditions.push(format!("public_key LIKE ${}", params.len()));
+        conditions.push(format!("public_key LIKE '{}%'", pk.replace('\'', "''")));
     }
     if let Some(ref fr) = filters.fee_recipient {
-        params.push(fr.clone());
-        conditions.push(format!("fee_recipient = ${}", params.len()));
+        conditions.push(format!("fee_recipient = '{}'", fr.replace('\'', "''")));
     }
     if let Some(ref gl) = filters.gas_limit {
-        params.push(gl.clone());
-        conditions.push(format!("gas_limit = ${}", params.len()));
+        conditions.push(format!("gas_limit = '{}'", gl.replace('\'', "''")));
     }
     if let Some(ref mv) = filters.min_value {
-        params.push(mv.clone());
-        conditions.push(format!("min_value = ${}", params.len()));
+        conditions.push(format!("min_value = '{}'", mv.replace('\'', "''")));
     }
     if let Some(rr) = filters.reset_relays {
         conditions.push(format!(

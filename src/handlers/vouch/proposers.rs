@@ -41,7 +41,8 @@ fn default_limit() -> i64 {
     responses(
         (status = 200, description = "List of proposers", body = PaginatedResponse<ProposerListItem>)
     ),
-    tag = "Vouch - Proposers"
+    tag = "Vouch - Proposers",
+    security(("bearer_auth" = []))
 )]
 #[instrument(skip(state))]
 pub async fn list_proposers(
@@ -154,7 +155,8 @@ pub async fn list_proposers(
         (status = 200, description = "Proposer details", body = ProposerResponse),
         (status = 404, description = "Proposer not found")
     ),
-    tag = "Vouch - Proposers"
+    tag = "Vouch - Proposers",
+    security(("bearer_auth" = []))
 )]
 #[instrument(skip(state))]
 pub async fn get_proposer(
@@ -212,7 +214,8 @@ pub async fn get_proposer(
         (status = 200, description = "Proposer updated", body = ProposerResponse),
         (status = 201, description = "Proposer created", body = ProposerResponse)
     ),
-    tag = "Vouch - Proposers"
+    tag = "Vouch - Proposers",
+    security(("bearer_auth" = []))
 )]
 #[instrument(skip(state))]
 pub async fn create_or_update_proposer(
@@ -342,7 +345,8 @@ pub async fn create_or_update_proposer(
         (status = 204, description = "Proposer deleted"),
         (status = 404, description = "Proposer not found")
     ),
-    tag = "Vouch - Proposers"
+    tag = "Vouch - Proposers",
+    security(("bearer_auth" = []))
 )]
 #[instrument(skip(state))]
 pub async fn delete_proposer(

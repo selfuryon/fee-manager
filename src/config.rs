@@ -4,9 +4,21 @@ use serde::Deserialize;
 #[derive(Clone, Deserialize, Debug)]
 pub struct AppConfig {
     pub database: DatabaseConfig,
+    pub auth: AuthConfig,
     pub log_level: String,
     pub host: String,
     pub port: u16,
+}
+
+#[derive(Clone, Deserialize, Debug, Default)]
+pub struct AuthConfig {
+    /// Enable authentication for admin routes (default: true)
+    #[serde(default = "default_auth_enabled")]
+    pub enabled: bool,
+}
+
+fn default_auth_enabled() -> bool {
+    true
 }
 
 impl AppConfig {

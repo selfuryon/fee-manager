@@ -34,6 +34,9 @@ pub enum ApiError {
     #[error("Invalid data: {0}")]
     InvalidData(String),
 
+    #[error("Unauthorized")]
+    Unauthorized,
+
     #[error("Database error: {0}")]
     DatabaseError(#[from] sqlx::Error),
 
@@ -68,6 +71,15 @@ impl IntoResponse for ApiError {
                     error: ErrorDetail {
                         code: "INVALID_DATA".to_string(),
                         message: msg.to_string(),
+                    },
+                },
+            ),
+            ApiError::Unauthorized => (
+                StatusCode::UNAUTHORIZED,
+                ErrorResponse {
+                    error: ErrorDetail {
+                        code: "UNAUTHORIZED".to_string(),
+                        message: "Authentication required".to_string(),
                     },
                 },
             ),

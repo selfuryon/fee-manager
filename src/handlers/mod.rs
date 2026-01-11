@@ -1,7 +1,8 @@
 // handlers/mod.rs - Main router and health endpoints
+use crate::auth;
 use crate::openapi;
 use crate::AppState;
-use axum::{response::IntoResponse, routing::get, Json, Router};
+use axum::{middleware, response::IntoResponse, routing::get, Json, Router};
 use serde::Serialize;
 use std::sync::Arc;
 use tracing::instrument;
@@ -51,9 +52,15 @@ pub fn create_router(state: Arc<AppState>) -> Router {
     let vouch_public = vouch::public_routes();
     let commit_boost_public = commit_boost::public_routes();
 
+    // Admin routes protected by authentication middleware
     let admin_routes = Router::new()
         .nest("/vouch", vouch::admin_routes())
-        .nest("/commit-boost", commit_boost::admin_routes());
+        .nest("/commit-boost", commit_boost::admin_routes())
+        .nest("/tokens", auth::handlers::token_routes())
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth::middleware::require_auth,
+        ));
 
     Router::new()
         .route("/ready", get(get_ready))

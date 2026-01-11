@@ -90,7 +90,7 @@ WHERE url LIKE '%flashbots%' OR url LIKE '%titan%' OR url LIKE '%eden%';
 INSERT INTO vouch_proposer_patterns (name, pattern, tags, fee_recipient, gas_limit, min_value, reset_relays) VALUES
     ('lido-validators', '^0x8[0-9a-f]{94}$', ARRAY['lido', 'liquid-staking'], '0x388c818ca8b9251b393131c08a736a67ccb19297', '30000000', '20000000000000000', false),
     ('rocketpool-nodes', '^0x9[0-9a-f]{94}$', ARRAY['rocketpool', 'decentralized'], '0x5e8422345238f34275888049021821e8e08caa1f', '32000000', '15000000000000000', false),
-    ('coinbase-cloud', '^0xa[0-9a-f]{94}$', ARRAY['coinbase', 'institutional'], '0xcoinbaserecipientaddress0000000000000000', '28000000', '50000000000000000', true),
+    ('coinbase-cloud', '^0xa[0-9a-f]{94}$', ARRAY['coinbase', 'institutional'], '0xc01ba5ec10daddee550000000000000000000000', '28000000', '50000000000000000', true),
     ('solo-stakers', '^0xb[0-9a-f]{94}$', ARRAY['solo', 'home-staker'], NULL, '30000000', '5000000000000000', false),
     ('testnet-validators', '^0x[0-9a-f]{96}$', ARRAY['testnet', 'hoodi'], '0x1234567890abcdef1234567890abcdef12345678', '30000000', NULL, true);
 

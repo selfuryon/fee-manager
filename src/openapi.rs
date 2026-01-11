@@ -1,4 +1,5 @@
-use utoipa::OpenApi;
+use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
+use utoipa::{Modify, OpenApi};
 
 #[derive(OpenApi)]
 #[openapi(
@@ -12,10 +13,15 @@ use utoipa::OpenApi;
             ("server_url" = (default = "http://localhost:3000", description = "API Server URL"))
         )),
     ),
+    modifiers(&SecurityAddon),
     paths(
         // Health
         crate::handlers::get_ready,
         crate::handlers::get_health,
+        // Auth
+        crate::auth::handlers::list_tokens,
+        crate::auth::handlers::create_token,
+        crate::auth::handlers::delete_token,
         // Vouch - Public
         crate::handlers::vouch::execution_config::get_execution_config,
         // Vouch - Proposers
@@ -82,10 +88,15 @@ use utoipa::OpenApi;
             crate::schema::UpdateMuxConfigRequest,
             crate::schema::MuxKeysRequest,
             crate::schema::MuxKeysResponse,
+            // Auth
+            crate::auth::TokenInfo,
+            crate::auth::handlers::CreateTokenRequest,
+            crate::auth::handlers::CreateTokenResponse,
         )
     ),
     tags(
         (name = "Health", description = "Service health endpoints"),
+        (name = "Auth", description = "API token management"),
         (name = "Vouch - Public", description = "Public Vouch endpoints for execution configuration"),
         (name = "Vouch - Proposers", description = "Admin endpoints for managing proposer configurations"),
         (name = "Vouch - Default Configs", description = "Admin endpoints for managing default configurations"),
@@ -95,3 +106,23 @@ use utoipa::OpenApi;
     )
 )]
 pub struct ApiDoc;
+
+/// Security scheme for Bearer token authentication
+struct SecurityAddon;
+
+impl Modify for SecurityAddon {
+    fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+        if let Some(components) = openapi.components.as_mut() {
+            components.add_security_scheme(
+                "bearer_auth",
+                SecurityScheme::Http(
+                    HttpBuilder::new()
+                        .scheme(HttpAuthScheme::Bearer)
+                        .bearer_format("token")
+                        .description(Some("API token for authentication"))
+                        .build(),
+                ),
+            );
+        }
+    }
+}

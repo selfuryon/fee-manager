@@ -27,6 +27,22 @@ async fn main() {
         panic!("Error running migrations: {}", e);
     }
 
+    // Generate initial API token if none exist
+    match fee_manager::auth::service::ensure_default_token(&pool).await {
+        Ok(Some(token)) => {
+            tracing::warn!("===========================================");
+            tracing::warn!("GENERATED INITIAL API TOKEN: {}", token);
+            tracing::warn!("Save this token! It will not be shown again.");
+            tracing::warn!("===========================================");
+        }
+        Ok(None) => {
+            // Token already exists, nothing to do
+        }
+        Err(e) => {
+            tracing::error!("Failed to ensure default token: {}", e);
+        }
+    }
+
     // Create shared state
     let state = Arc::new(AppState {
         pool,

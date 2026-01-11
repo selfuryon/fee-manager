@@ -88,7 +88,8 @@ pub async fn get_mux_keys_public(
     responses(
         (status = 200, description = "List of mux configs", body = PaginatedResponse<MuxConfigListItem>)
     ),
-    tag = "Commit-Boost - Mux"
+    tag = "Commit-Boost - Mux",
+    security(("bearer_auth" = []))
 )]
 #[instrument(skip(state))]
 pub async fn list_mux_configs(
@@ -147,7 +148,8 @@ pub async fn list_mux_configs(
         (status = 200, description = "Mux config details", body = MuxConfigResponse),
         (status = 404, description = "Mux config not found")
     ),
-    tag = "Commit-Boost - Mux"
+    tag = "Commit-Boost - Mux",
+    security(("bearer_auth" = []))
 )]
 #[instrument(skip(state))]
 pub async fn get_mux_config(
@@ -187,7 +189,8 @@ pub async fn get_mux_config(
         (status = 201, description = "Mux config created", body = MuxConfigListItem),
         (status = 409, description = "Mux config already exists")
     ),
-    tag = "Commit-Boost - Mux"
+    tag = "Commit-Boost - Mux",
+    security(("bearer_auth" = []))
 )]
 #[instrument(skip(state))]
 pub async fn create_mux_config(
@@ -256,7 +259,8 @@ pub async fn create_mux_config(
         (status = 200, description = "Mux config updated", body = MuxConfigResponse),
         (status = 404, description = "Mux config not found")
     ),
-    tag = "Commit-Boost - Mux"
+    tag = "Commit-Boost - Mux",
+    security(("bearer_auth" = []))
 )]
 #[instrument(skip(state))]
 pub async fn update_mux_config(
@@ -330,7 +334,8 @@ pub async fn update_mux_config(
         (status = 204, description = "Mux config deleted"),
         (status = 404, description = "Mux config not found")
     ),
-    tag = "Commit-Boost - Mux"
+    tag = "Commit-Boost - Mux",
+    security(("bearer_auth" = []))
 )]
 #[instrument(skip(state))]
 pub async fn delete_mux_config(
@@ -365,7 +370,8 @@ pub async fn delete_mux_config(
         (status = 200, description = "Keys added", body = MuxKeysResponse),
         (status = 404, description = "Mux config not found")
     ),
-    tag = "Commit-Boost - Mux"
+    tag = "Commit-Boost - Mux",
+    security(("bearer_auth" = []))
 )]
 #[instrument(skip(state))]
 pub async fn add_mux_keys(
@@ -438,7 +444,8 @@ pub async fn add_mux_keys(
         (status = 200, description = "Keys removed", body = MuxKeysResponse),
         (status = 404, description = "Mux config not found")
     ),
-    tag = "Commit-Boost - Mux"
+    tag = "Commit-Boost - Mux",
+    security(("bearer_auth" = []))
 )]
 #[instrument(skip(state))]
 pub async fn remove_mux_keys(

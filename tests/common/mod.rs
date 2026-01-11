@@ -2,7 +2,7 @@
 #![allow(dead_code)]
 
 use fee_manager::{config, create_router, run_migrations, AppState};
-use reqwest::Client;
+use reqwest::{Client, header};
 use sqlx::PgPool;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
@@ -14,6 +14,7 @@ static TEST_COUNTER: AtomicU32 = AtomicU32::new(0);
 pub struct TestApp {
     pub address: String,
     pub pool: PgPool,
+    pub auth_token: String,
 }
 
 impl TestApp {
@@ -57,11 +58,30 @@ impl TestApp {
             .await
             .expect("Failed to connect to database for tests");
 
-        TEST_APP.get_or_init(|| TestApp { address, pool })
+        // Create a test auth token
+        let (_, auth_token) = fee_manager::auth::service::create_token(&pool, "test-token", Some("Token for integration tests"))
+            .await
+            .expect("Failed to create test auth token");
+
+        TEST_APP.get_or_init(|| TestApp { address, pool, auth_token })
     }
 
-    /// Create a new HTTP client for this test
+    /// Create a new HTTP client with authentication for this test
     pub fn client(&self) -> Client {
+        let mut headers = header::HeaderMap::new();
+        headers.insert(
+            header::AUTHORIZATION,
+            header::HeaderValue::from_str(&format!("Bearer {}", self.auth_token))
+                .expect("Invalid auth token"),
+        );
+        Client::builder()
+            .default_headers(headers)
+            .build()
+            .expect("Failed to create HTTP client")
+    }
+
+    /// Create a new HTTP client WITHOUT authentication (for testing public routes or auth failures)
+    pub fn client_unauthenticated(&self) -> Client {
         Client::new()
     }
 
@@ -149,6 +169,11 @@ impl TestApp {
             .ok();
 
         sqlx::query("DELETE FROM commit_boost_mux_configs WHERE name LIKE 'test_%'")
+            .execute(&self.pool)
+            .await
+            .ok();
+
+        sqlx::query("DELETE FROM auth_tokens WHERE name LIKE 'test-%'")
             .execute(&self.pool)
             .await
             .ok();

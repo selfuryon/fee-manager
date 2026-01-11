@@ -43,7 +43,8 @@ fn default_limit() -> i64 {
     responses(
         (status = 200, description = "List of proposer patterns", body = PaginatedResponse<ProposerPatternListItem>)
     ),
-    tag = "Vouch - Proposer Patterns"
+    tag = "Vouch - Proposer Patterns",
+    security(("bearer_auth" = []))
 )]
 #[instrument(skip(state))]
 pub async fn list_proposer_patterns(
@@ -125,7 +126,8 @@ pub async fn list_proposer_patterns(
         (status = 200, description = "Proposer pattern details", body = ProposerPatternResponse),
         (status = 404, description = "Pattern not found")
     ),
-    tag = "Vouch - Proposer Patterns"
+    tag = "Vouch - Proposer Patterns",
+    security(("bearer_auth" = []))
 )]
 #[instrument(skip(state))]
 pub async fn get_proposer_pattern(
@@ -182,7 +184,8 @@ pub async fn get_proposer_pattern(
         (status = 201, description = "Pattern created", body = ProposerPatternResponse),
         (status = 409, description = "Pattern already exists")
     ),
-    tag = "Vouch - Proposer Patterns"
+    tag = "Vouch - Proposer Patterns",
+    security(("bearer_auth" = []))
 )]
 #[instrument(skip(state))]
 pub async fn create_proposer_pattern(
@@ -295,7 +298,8 @@ pub async fn create_proposer_pattern(
         (status = 200, description = "Pattern updated", body = ProposerPatternResponse),
         (status = 404, description = "Pattern not found")
     ),
-    tag = "Vouch - Proposer Patterns"
+    tag = "Vouch - Proposer Patterns",
+    security(("bearer_auth" = []))
 )]
 #[instrument(skip(state))]
 pub async fn update_proposer_pattern(
@@ -456,7 +460,8 @@ pub async fn update_proposer_pattern(
         (status = 204, description = "Pattern deleted"),
         (status = 404, description = "Pattern not found")
     ),
-    tag = "Vouch - Proposer Patterns"
+    tag = "Vouch - Proposer Patterns",
+    security(("bearer_auth" = []))
 )]
 #[instrument(skip(state))]
 pub async fn delete_proposer_pattern(

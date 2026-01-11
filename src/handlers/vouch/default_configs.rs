@@ -41,7 +41,8 @@ fn default_limit() -> i64 {
     responses(
         (status = 200, description = "List of default configs", body = PaginatedResponse<DefaultConfigListItem>)
     ),
-    tag = "Vouch - Default Configs"
+    tag = "Vouch - Default Configs",
+    security(("bearer_auth" = []))
 )]
 #[instrument(skip(state))]
 pub async fn list_default_configs(
@@ -151,7 +152,8 @@ pub async fn list_default_configs(
         (status = 200, description = "Default config details", body = DefaultConfigResponse),
         (status = 404, description = "Config not found")
     ),
-    tag = "Vouch - Default Configs"
+    tag = "Vouch - Default Configs",
+    security(("bearer_auth" = []))
 )]
 #[instrument(skip(state))]
 pub async fn get_default_config(
@@ -206,7 +208,8 @@ pub async fn get_default_config(
         (status = 201, description = "Config created", body = DefaultConfigResponse),
         (status = 409, description = "Config already exists")
     ),
-    tag = "Vouch - Default Configs"
+    tag = "Vouch - Default Configs",
+    security(("bearer_auth" = []))
 )]
 #[instrument(skip(state))]
 pub async fn create_default_config(
@@ -315,7 +318,8 @@ pub async fn create_default_config(
         (status = 200, description = "Config updated", body = DefaultConfigResponse),
         (status = 404, description = "Config not found")
     ),
-    tag = "Vouch - Default Configs"
+    tag = "Vouch - Default Configs",
+    security(("bearer_auth" = []))
 )]
 #[instrument(skip(state))]
 pub async fn update_default_config(
@@ -445,7 +449,8 @@ pub async fn update_default_config(
         (status = 204, description = "Config deleted"),
         (status = 404, description = "Config not found")
     ),
-    tag = "Vouch - Default Configs"
+    tag = "Vouch - Default Configs",
+    security(("bearer_auth" = []))
 )]
 #[instrument(skip(state))]
 pub async fn delete_default_config(

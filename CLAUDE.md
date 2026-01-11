@@ -185,3 +185,21 @@ vouch --proposer-config-check 0x8021...8bbe | jq .
 - `disabled: true` on relay means it's disabled
 - Unknown proposers (validators not in DB) are not included in response - Vouch will apply default config for them
 - Proposers are identified by validator public_key and include full configuration inline
+
+## Development Checklist
+
+When adding new routes:
+
+1. **OpenAPI schema** (`src/openapi.rs`):
+   - Add handler paths to `paths(...)` section
+   - Add request/response schemas to `components(schemas(...))` section
+   - Add new tag if needed to `tags(...)` section
+
+2. **Tests** (`tests/`):
+   - Add integration tests for new endpoints
+   - Use `TestApp::client()` for authenticated requests
+   - Use `TestApp::client_unauthenticated()` for public routes or auth failure tests
+
+3. **Run checks**:
+   - `cargo test` - all tests must pass
+   - `cargo sqlx prepare` - update offline query cache if new SQL queries added

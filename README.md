@@ -30,9 +30,9 @@ Fee Manager provides centralized configuration management for:
 
 ### Prerequisites
 
-- Rust 1.75+
+- Rust 1.90+
 - PostgreSQL 14+
-- Docker/Podman (optional, for database)
+- Docker/Podman (optional)
 
 ### Configuration
 
@@ -46,7 +46,14 @@ database:
   password: postgres
   dbname: fee_manager
 
+auth:
+  enabled: true          # Enable Bearer token auth for admin routes
+
 log_level: info
+log_format: text         # "text" or "json"
+audit_enabled: true      # Enable audit trail logging
+audit_output: stderr     # "stdout", "stderr", or file path
+
 host: 0.0.0.0
 port: 3000
 ```
@@ -56,6 +63,7 @@ Environment variables can override config values with `FEE_MANAGER_` prefix:
 ```bash
 export FEE_MANAGER_DATABASE__HOST=localhost
 export FEE_MANAGER_DATABASE__PASSWORD=secret
+export FEE_MANAGER_AUTH__ENABLED=true
 ```
 
 ### Database Setup
@@ -86,6 +94,26 @@ cargo build --release
 
 The service will be available at `http://localhost:3000`.
 
+### Container Build
+
+```bash
+# Build image
+docker build -f Containerfile -t fee-manager .
+
+# Run with config file
+docker run -p 3000:3000 -v ./config.yaml:/app/config.yaml fee-manager
+```
+
+## Authentication
+
+Admin endpoints (`/api/admin/*`) require Bearer token authentication:
+
+```
+Authorization: Bearer <token>
+```
+
+Tokens are stored in the database. On first startup, a default token is auto-generated and printed to the logs. Additional tokens can be managed via the admin API.
+
 ## API Endpoints
 
 ### Public Endpoints
@@ -96,6 +124,14 @@ The service will be available at `http://localhost:3000`.
 | GET | `/commit-boost/v1/mux/{name}` | Get validator keys for Commit-Boost |
 
 ### Admin Endpoints (Protected)
+
+#### Auth Tokens
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/admin/tokens` | List tokens |
+| POST | `/api/admin/tokens` | Create token |
+| DELETE | `/api/admin/tokens/{id}` | Delete token |
 
 #### Vouch - Default Configs
 
@@ -169,6 +205,7 @@ curl "http://localhost:3000/commit-boost/v1/mux/pool-1"
 
 ```bash
 curl -X POST "http://localhost:3000/api/admin/vouch/configs/default" \
+  -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "main",
@@ -188,6 +225,7 @@ curl -X POST "http://localhost:3000/api/admin/vouch/configs/default" \
 
 ```bash
 curl -X POST "http://localhost:3000/api/admin/vouch/proposer-patterns" \
+  -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "pool1-mainnet",
@@ -201,6 +239,9 @@ curl -X POST "http://localhost:3000/api/admin/vouch/proposer-patterns" \
 ## Database Schema
 
 The service uses a normalized PostgreSQL schema with the following tables:
+
+**Auth:**
+- `auth_tokens` - API tokens for admin authentication
 
 **Vouch:**
 - `vouch_default_configs` - Named default configurations

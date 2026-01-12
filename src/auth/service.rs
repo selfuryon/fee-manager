@@ -55,6 +55,34 @@ pub async fn validate_token(pool: &PgPool, token: &str) -> Result<bool, ApiError
     Ok(result)
 }
 
+/// Get token info by hash (for audit logging)
+/// Returns the token with updated last_used_at
+pub async fn get_token_by_hash(pool: &PgPool, token: &str) -> Result<Option<AuthToken>, ApiError> {
+    let hash = hash_token(token);
+
+    let token = sqlx::query_as!(
+        AuthToken,
+        r#"
+        SELECT id, name, description, token_hash, created_at, last_used_at, active
+        FROM auth_tokens
+        WHERE token_hash = $1
+        "#,
+        hash
+    )
+    .fetch_optional(pool)
+    .await?;
+
+    Ok(token)
+}
+
+/// Update last_used_at for a token
+pub async fn update_last_used(pool: &PgPool, id: Uuid) -> Result<(), ApiError> {
+    sqlx::query!("UPDATE auth_tokens SET last_used_at = NOW() WHERE id = $1", id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
 /// Create a new token in the database
 pub async fn create_token(
     pool: &PgPool,

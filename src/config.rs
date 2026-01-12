@@ -6,8 +6,29 @@ pub struct AppConfig {
     pub database: DatabaseConfig,
     pub auth: AuthConfig,
     pub log_level: String,
+    /// Log format: "text" (default) or "json"
+    #[serde(default = "default_log_format")]
+    pub log_format: String,
+    /// Enable audit trail logging (default: true)
+    #[serde(default = "default_audit_enabled")]
+    pub audit_enabled: bool,
+    /// Audit output destination: "stdout", "stderr", or file path (default: "stderr")
+    #[serde(default = "default_audit_output")]
+    pub audit_output: String,
     pub host: String,
     pub port: u16,
+}
+
+fn default_log_format() -> String {
+    "text".to_string()
+}
+
+fn default_audit_enabled() -> bool {
+    true
+}
+
+fn default_audit_output() -> String {
+    "stderr".to_string()
 }
 
 #[derive(Clone, Deserialize, Debug, Default)]

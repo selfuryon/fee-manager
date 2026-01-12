@@ -1,4 +1,6 @@
 // handlers/vouch/proposers.rs - Proposer CRUD handlers
+use crate::audit::{AuditAction, AuditChanges, RequestContext, ResourceType};
+use crate::audit_log;
 use crate::errors::ApiError;
 use crate::schema::{
     CreateOrUpdateProposerRequest, PaginatedResponse, ProposerListItem, ProposerRelayConfig,
@@ -217,9 +219,10 @@ pub async fn get_proposer(
     tag = "Vouch - Proposers",
     security(("bearer_auth" = []))
 )]
-#[instrument(skip(state))]
+#[instrument(skip(state, ctx))]
 pub async fn create_or_update_proposer(
     State(state): State<Arc<AppState>>,
+    ctx: RequestContext,
     Path(public_key): Path<String>,
     Json(req): Json<CreateOrUpdateProposerRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
@@ -291,6 +294,20 @@ pub async fn create_or_update_proposer(
 
     tx.commit().await?;
 
+    // Audit log
+    if state.config.audit_enabled {
+        let changes = AuditChanges {
+            fee_recipient: req.fee_recipient.as_ref().map(|a| a.to_string()),
+            min_value: req.min_value.clone(),
+            gas_limit: req.gas_limit.clone(),
+            reset_relays: Some(req.reset_relays),
+            relays_count: req.relays.as_ref().map(|r| r.len()),
+            ..Default::default()
+        };
+        let action = if is_new { AuditAction::Create } else { AuditAction::Update };
+        audit_log!(ctx, action, ResourceType::VouchProposer, &public_key, changes);
+    }
+
     // Fetch the result
     let proposer = sqlx::query_as::<_, crate::models::VouchProposer>(
         "SELECT public_key, fee_recipient, gas_limit, min_value, reset_relays, created_at, updated_at
@@ -348,9 +365,10 @@ pub async fn create_or_update_proposer(
     tag = "Vouch - Proposers",
     security(("bearer_auth" = []))
 )]
-#[instrument(skip(state))]
+#[instrument(skip(state, ctx))]
 pub async fn delete_proposer(
     State(state): State<Arc<AppState>>,
+    ctx: RequestContext,
     Path(public_key): Path<String>,
 ) -> Result<impl IntoResponse, ApiError> {
     info!("Deleting proposer: {}", public_key);
@@ -365,6 +383,11 @@ pub async fn delete_proposer(
             "Proposer '{}' not found",
             public_key
         )));
+    }
+
+    // Audit log
+    if state.config.audit_enabled {
+        audit_log!(ctx, AuditAction::Delete, ResourceType::VouchProposer, &public_key);
     }
 
     Ok(StatusCode::NO_CONTENT)

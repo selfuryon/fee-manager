@@ -1,4 +1,6 @@
 // handlers/vouch/proposer_patterns.rs - Proposer Pattern CRUD handlers
+use crate::audit::{AuditAction, AuditChanges, RequestContext, ResourceType};
+use crate::audit_log;
 use crate::errors::ApiError;
 use crate::schema::{
     CreateProposerPatternRequest, PaginatedResponse, ProposerPatternListItem,
@@ -187,9 +189,10 @@ pub async fn get_proposer_pattern(
     tag = "Vouch - Proposer Patterns",
     security(("bearer_auth" = []))
 )]
-#[instrument(skip(state))]
+#[instrument(skip(state, ctx))]
 pub async fn create_proposer_pattern(
     State(state): State<Arc<AppState>>,
+    ctx: RequestContext,
     Json(req): Json<CreateProposerPatternRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
     info!("Creating proposer pattern: {}", req.name);
@@ -244,6 +247,21 @@ pub async fn create_proposer_pattern(
     }
 
     tx.commit().await?;
+
+    // Audit log
+    if state.config.audit_enabled {
+        let changes = AuditChanges {
+            pattern: Some(req.pattern.clone()),
+            tags: Some(req.tags.clone()),
+            fee_recipient: req.fee_recipient.as_ref().map(|a| a.to_string()),
+            min_value: req.min_value.clone(),
+            gas_limit: req.gas_limit.clone(),
+            reset_relays: Some(req.reset_relays),
+            relays_count: req.relays.as_ref().map(|r| r.len()),
+            ..Default::default()
+        };
+        audit_log!(ctx, AuditAction::Create, ResourceType::VouchProposerPattern, &req.name, changes);
+    }
 
     // Fetch created pattern
     let pattern = sqlx::query_as::<_, crate::models::VouchProposerPattern>(
@@ -301,9 +319,10 @@ pub async fn create_proposer_pattern(
     tag = "Vouch - Proposer Patterns",
     security(("bearer_auth" = []))
 )]
-#[instrument(skip(state))]
+#[instrument(skip(state, ctx))]
 pub async fn update_proposer_pattern(
     State(state): State<Arc<AppState>>,
+    ctx: RequestContext,
     Path(name): Path<String>,
     Json(req): Json<UpdateProposerPatternRequest>,
 ) -> Result<Json<ProposerPatternResponse>, ApiError> {
@@ -410,6 +429,21 @@ pub async fn update_proposer_pattern(
 
     tx.commit().await?;
 
+    // Audit log
+    if state.config.audit_enabled {
+        let changes = AuditChanges {
+            pattern: req.pattern.clone(),
+            tags: req.tags.clone(),
+            fee_recipient: req.fee_recipient.as_ref().map(|a| a.to_string()),
+            min_value: req.min_value.clone(),
+            gas_limit: req.gas_limit.clone(),
+            reset_relays: req.reset_relays,
+            relays_count: req.relays.as_ref().map(|r| r.len()),
+            ..Default::default()
+        };
+        audit_log!(ctx, AuditAction::Update, ResourceType::VouchProposerPattern, &name, changes);
+    }
+
     // Fetch updated pattern
     let pattern = sqlx::query_as::<_, crate::models::VouchProposerPattern>(
         "SELECT name, pattern, tags, fee_recipient, gas_limit, min_value, reset_relays, created_at, updated_at
@@ -463,9 +497,10 @@ pub async fn update_proposer_pattern(
     tag = "Vouch - Proposer Patterns",
     security(("bearer_auth" = []))
 )]
-#[instrument(skip(state))]
+#[instrument(skip(state, ctx))]
 pub async fn delete_proposer_pattern(
     State(state): State<Arc<AppState>>,
+    ctx: RequestContext,
     Path(name): Path<String>,
 ) -> Result<impl IntoResponse, ApiError> {
     info!("Deleting proposer pattern: {}", name);
@@ -480,6 +515,11 @@ pub async fn delete_proposer_pattern(
             "Proposer pattern '{}' not found",
             name
         )));
+    }
+
+    // Audit log
+    if state.config.audit_enabled {
+        audit_log!(ctx, AuditAction::Delete, ResourceType::VouchProposerPattern, &name);
     }
 
     Ok(StatusCode::NO_CONTENT)

@@ -1,4 +1,6 @@
 // handlers/vouch/default_configs.rs - Default Config CRUD handlers
+use crate::audit::{AuditAction, AuditChanges, RequestContext, ResourceType};
+use crate::audit_log;
 use crate::errors::ApiError;
 use crate::schema::{
     CreateDefaultConfigRequest, DefaultConfigListItem, DefaultConfigResponse, PaginatedResponse,
@@ -211,9 +213,10 @@ pub async fn get_default_config(
     tag = "Vouch - Default Configs",
     security(("bearer_auth" = []))
 )]
-#[instrument(skip(state))]
+#[instrument(skip(state, ctx))]
 pub async fn create_default_config(
     State(state): State<Arc<AppState>>,
+    ctx: RequestContext,
     Json(req): Json<CreateDefaultConfigRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
     info!("Creating default config: {}", req.name);
@@ -266,6 +269,19 @@ pub async fn create_default_config(
     }
 
     tx.commit().await?;
+
+    // Audit log
+    if state.config.audit_enabled {
+        let changes = AuditChanges {
+            fee_recipient: req.fee_recipient.as_ref().map(|a| a.to_string()),
+            min_value: req.min_value.clone(),
+            gas_limit: req.gas_limit.clone(),
+            active: Some(req.active),
+            relays_count: req.relays.as_ref().map(|r| r.len()),
+            ..Default::default()
+        };
+        audit_log!(ctx, AuditAction::Create, ResourceType::VouchDefaultConfig, &req.name, changes);
+    }
 
     // Fetch the created config
     let config = sqlx::query_as::<_, crate::models::VouchDefaultConfig>(
@@ -321,9 +337,10 @@ pub async fn create_default_config(
     tag = "Vouch - Default Configs",
     security(("bearer_auth" = []))
 )]
-#[instrument(skip(state))]
+#[instrument(skip(state, ctx))]
 pub async fn update_default_config(
     State(state): State<Arc<AppState>>,
+    ctx: RequestContext,
     Path(name): Path<String>,
     Json(req): Json<UpdateDefaultConfigRequest>,
 ) -> Result<Json<DefaultConfigResponse>, ApiError> {
@@ -401,6 +418,19 @@ pub async fn update_default_config(
 
     tx.commit().await?;
 
+    // Audit log
+    if state.config.audit_enabled {
+        let changes = AuditChanges {
+            fee_recipient: req.fee_recipient.as_ref().map(|a| a.to_string()),
+            min_value: req.min_value.clone(),
+            gas_limit: req.gas_limit.clone(),
+            active: req.active,
+            relays_count: req.relays.as_ref().map(|r| r.len()),
+            ..Default::default()
+        };
+        audit_log!(ctx, AuditAction::Update, ResourceType::VouchDefaultConfig, &name, changes);
+    }
+
     // Fetch updated config
     let config = sqlx::query_as::<_, crate::models::VouchDefaultConfig>(
         "SELECT name, fee_recipient, gas_limit, min_value, active, created_at, updated_at
@@ -452,9 +482,10 @@ pub async fn update_default_config(
     tag = "Vouch - Default Configs",
     security(("bearer_auth" = []))
 )]
-#[instrument(skip(state))]
+#[instrument(skip(state, ctx))]
 pub async fn delete_default_config(
     State(state): State<Arc<AppState>>,
+    ctx: RequestContext,
     Path(name): Path<String>,
 ) -> Result<impl IntoResponse, ApiError> {
     info!("Deleting default config: {}", name);
@@ -469,6 +500,11 @@ pub async fn delete_default_config(
             "Default config '{}' not found",
             name
         )));
+    }
+
+    // Audit log
+    if state.config.audit_enabled {
+        audit_log!(ctx, AuditAction::Delete, ResourceType::VouchDefaultConfig, &name);
     }
 
     Ok(StatusCode::NO_CONTENT)

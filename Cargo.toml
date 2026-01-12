@@ -13,6 +13,7 @@ name = "fee-manager"
 
 [dependencies]
 axum = "0.8"
+tower-http = { version = "0.6", features = ["request-id", "util"] }
 utoipa = { version = "5", features = ["axum_extras", "chrono", "uuid"] }
 utoipa-swagger-ui = { version = "9", features = ["axum"] }
 

@@ -9,11 +9,22 @@ async fn main() {
     // Load configuration
     let config = config::load_config().expect("Failed to load configuration");
 
-    // Initialize tracing
-    tracing_subscriber::registry()
-        .with(tracing_subscriber::EnvFilter::new(&config.log_level))
-        .with(tracing_subscriber::fmt::layer())
-        .init();
+    // Initialize tracing with conditional JSON format
+    let subscriber = tracing_subscriber::registry()
+        .with(tracing_subscriber::EnvFilter::new(&config.log_level));
+
+    if config.log_format == "json" {
+        subscriber
+            .with(tracing_subscriber::fmt::layer().json())
+            .init();
+    } else {
+        subscriber.with(tracing_subscriber::fmt::layer()).init();
+    }
+
+    // Initialize audit writer if audit is enabled
+    if config.audit_enabled {
+        fee_manager::audit::init_audit_writer(&config.audit_output);
+    }
 
     // Create database connection pool
     let pool = PgPoolOptions::new()

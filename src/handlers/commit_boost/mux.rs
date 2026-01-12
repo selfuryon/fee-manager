@@ -1,5 +1,7 @@
 // handlers/commit_boost/mux.rs - Mux config CRUD handlers
 use crate::addresses::BlsPubkey;
+use crate::audit::{AuditAction, AuditChanges, RequestContext, ResourceType};
+use crate::audit_log;
 use crate::errors::ApiError;
 use crate::schema::{
     CreateMuxConfigRequest, MuxConfigListItem, MuxConfigResponse, MuxKeysRequest, MuxKeysResponse,
@@ -192,9 +194,10 @@ pub async fn get_mux_config(
     tag = "Commit-Boost - Mux",
     security(("bearer_auth" = []))
 )]
-#[instrument(skip(state))]
+#[instrument(skip(state, ctx))]
 pub async fn create_mux_config(
     State(state): State<Arc<AppState>>,
+    ctx: RequestContext,
     Json(req): Json<CreateMuxConfigRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
     info!("Creating mux config: {}", req.name);
@@ -231,6 +234,15 @@ pub async fn create_mux_config(
 
     tx.commit().await?;
 
+    // Audit log
+    if state.config.audit_enabled {
+        let changes = AuditChanges {
+            key_count: Some(req.keys.len() as i64),
+            ..Default::default()
+        };
+        audit_log!(ctx, AuditAction::Create, ResourceType::CommitBoostMux, &req.name, changes);
+    }
+
     let config = sqlx::query_as::<_, crate::models::CommitBoostMuxConfig>(
         "SELECT name, created_at, updated_at FROM commit_boost_mux_configs WHERE name = $1",
     )
@@ -262,9 +274,10 @@ pub async fn create_mux_config(
     tag = "Commit-Boost - Mux",
     security(("bearer_auth" = []))
 )]
-#[instrument(skip(state))]
+#[instrument(skip(state, ctx))]
 pub async fn update_mux_config(
     State(state): State<Arc<AppState>>,
+    ctx: RequestContext,
     Path(name): Path<String>,
     Json(req): Json<UpdateMuxConfigRequest>,
 ) -> Result<Json<MuxConfigResponse>, ApiError> {
@@ -309,6 +322,15 @@ pub async fn update_mux_config(
 
     tx.commit().await?;
 
+    // Audit log
+    if state.config.audit_enabled {
+        let changes = AuditChanges {
+            key_count: Some(req.keys.len() as i64),
+            ..Default::default()
+        };
+        audit_log!(ctx, AuditAction::Update, ResourceType::CommitBoostMux, &name, changes);
+    }
+
     let config = sqlx::query_as::<_, crate::models::CommitBoostMuxConfig>(
         "SELECT name, created_at, updated_at FROM commit_boost_mux_configs WHERE name = $1",
     )
@@ -337,9 +359,10 @@ pub async fn update_mux_config(
     tag = "Commit-Boost - Mux",
     security(("bearer_auth" = []))
 )]
-#[instrument(skip(state))]
+#[instrument(skip(state, ctx))]
 pub async fn delete_mux_config(
     State(state): State<Arc<AppState>>,
+    ctx: RequestContext,
     Path(name): Path<String>,
 ) -> Result<impl IntoResponse, ApiError> {
     info!("Deleting mux config: {}", name);
@@ -354,6 +377,11 @@ pub async fn delete_mux_config(
             "Mux config '{}' not found",
             name
         )));
+    }
+
+    // Audit log
+    if state.config.audit_enabled {
+        audit_log!(ctx, AuditAction::Delete, ResourceType::CommitBoostMux, &name);
     }
 
     Ok(StatusCode::NO_CONTENT)
@@ -373,9 +401,10 @@ pub async fn delete_mux_config(
     tag = "Commit-Boost - Mux",
     security(("bearer_auth" = []))
 )]
-#[instrument(skip(state))]
+#[instrument(skip(state, ctx))]
 pub async fn add_mux_keys(
     State(state): State<Arc<AppState>>,
+    ctx: RequestContext,
     Path(name): Path<String>,
     Json(req): Json<MuxKeysRequest>,
 ) -> Result<Json<MuxKeysResponse>, ApiError> {
@@ -426,6 +455,15 @@ pub async fn add_mux_keys(
             .fetch_one(&state.pool)
             .await?;
 
+    // Audit log
+    if state.config.audit_enabled {
+        let changes = AuditChanges {
+            key_count: Some(added),
+            ..Default::default()
+        };
+        audit_log!(ctx, AuditAction::AddKeys, ResourceType::CommitBoostMux, &name, changes);
+    }
+
     Ok(Json(MuxKeysResponse {
         added: Some(added),
         removed: None,
@@ -447,9 +485,10 @@ pub async fn add_mux_keys(
     tag = "Commit-Boost - Mux",
     security(("bearer_auth" = []))
 )]
-#[instrument(skip(state))]
+#[instrument(skip(state, ctx))]
 pub async fn remove_mux_keys(
     State(state): State<Arc<AppState>>,
+    ctx: RequestContext,
     Path(name): Path<String>,
     Json(req): Json<MuxKeysRequest>,
 ) -> Result<Json<MuxKeysResponse>, ApiError> {
@@ -495,6 +534,15 @@ pub async fn remove_mux_keys(
             .bind(&name)
             .fetch_one(&state.pool)
             .await?;
+
+    // Audit log
+    if state.config.audit_enabled {
+        let changes = AuditChanges {
+            key_count: Some(removed),
+            ..Default::default()
+        };
+        audit_log!(ctx, AuditAction::RemoveKeys, ResourceType::CommitBoostMux, &name, changes);
+    }
 
     Ok(Json(MuxKeysResponse {
         added: None,

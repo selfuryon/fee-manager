@@ -1,6 +1,9 @@
 host: 0.0.0.0
 port: 3000
 log_level: info
+log_format: text    # text | json
+audit_enabled: true
+audit_output: stderr  # stdout | stderr | /path/to/audit.log
 auth:
   enabled: true
 database:

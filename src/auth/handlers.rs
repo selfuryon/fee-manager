@@ -12,6 +12,8 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use super::{service, TokenInfo};
+use crate::audit::{AuditAction, AuditChanges, RequestContext, ResourceType};
+use crate::audit_log;
 use crate::{errors::ApiError, AppState};
 
 /// Request body for creating a new token
@@ -74,10 +76,20 @@ pub async fn list_tokens(
 )]
 pub async fn create_token(
     State(state): State<Arc<AppState>>,
+    ctx: RequestContext,
     Json(request): Json<CreateTokenRequest>,
 ) -> Result<Json<CreateTokenResponse>, ApiError> {
     let (token, plaintext) =
         service::create_token(&state.pool, &request.name, request.description.as_deref()).await?;
+
+    // Audit log
+    if state.config.audit_enabled {
+        let changes = AuditChanges {
+            name: Some(token.name.clone()),
+            ..Default::default()
+        };
+        audit_log!(ctx, AuditAction::Create, ResourceType::AuthToken, token.id.to_string(), changes);
+    }
 
     Ok(Json(CreateTokenResponse {
         id: token.id,
@@ -104,11 +116,16 @@ pub async fn create_token(
 )]
 pub async fn delete_token(
     State(state): State<Arc<AppState>>,
+    ctx: RequestContext,
     Path(id): Path<Uuid>,
 ) -> Result<axum::http::StatusCode, ApiError> {
     let deleted = service::delete_token(&state.pool, id).await?;
 
     if deleted {
+        // Audit log
+        if state.config.audit_enabled {
+            audit_log!(ctx, AuditAction::Delete, ResourceType::AuthToken, id.to_string());
+        }
         Ok(axum::http::StatusCode::NO_CONTENT)
     } else {
         Err(ApiError::NotFound(format!("Token {} not found", id)))

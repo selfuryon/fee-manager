@@ -15,7 +15,14 @@ REST API for managing validator configurations for:
 ## Authentication
 
 - **Public endpoints**: No authentication required
-- **Protected endpoints** (`/api/admin/*`): Authentication required (implementation TBD)
+- **Protected endpoints** (`/api/admin/*`): Bearer token authentication required
+
+**Authentication Header**:
+```
+Authorization: Bearer <token>
+```
+
+The token is configured via the `AUTH_TOKEN` environment variable on the server.
 
 ---
 
@@ -35,12 +42,10 @@ Main endpoint used by Vouch to fetch execution configuration.
 
 **Request Body**:
 ```json
-{
-  "keys": ["0x8021...8bbe", "0xa123...def4", "0xb456...789a"]
-}
+["0x8021...8bbe", "0xa123...def4", "0xb456...789a"]
 ```
 
-JSON object with `keys` field containing array of validator public keys (hex strings with 0x prefix).
+Plain JSON array of validator public keys (hex strings with 0x prefix).
 
 **Response**: `200 OK`
 ```json
@@ -81,18 +86,19 @@ JSON object with `keys` field containing array of validator public keys (hex str
 
 **Response Building Logic**:
 1. Load default config by name from `:config` path parameter
-2. Load validator-specific configs for public keys in `keys` field (if they exist)
+2. Load validator-specific configs for public keys in request body (if they exist)
 3. Load pattern-based proposer configs matching tags from `?tags` query parameter (OR logic)
+   - Patterns are sorted by the position of their first matching tag in the request
 4. Build response:
    - Top-level fields from default config
    - `proposers` array containing:
      - Validator-specific entries (for known validators from request)
-     - Pattern-based entries (from matched tags)
+     - Pattern-based entries (from matched tags, ordered by tag position)
 
 **Error Responses**:
 - `400 Bad Request`: Invalid request format
   ```json
-  { "error": "Invalid request body: missing 'keys' field" }
+  { "error": "Invalid request body: expected array of validator public keys" }
   ```
 - `404 Not Found`: Default config not found
   ```json
@@ -109,12 +115,12 @@ JSON object with `keys` field containing array of validator public keys (hex str
 # Simple request with default config only
 curl -X POST "http://localhost:8080/vouch/v2/execution-config/main" \
   -H "Content-Type: application/json" \
-  -d '{"keys": ["0x8021...8bbe", "0xa123...def4"]}'
+  -d '["0x8021...8bbe", "0xa123...def4"]'
 
 # Request with tags for pattern-based proposers
 curl -X POST "http://localhost:8080/vouch/v2/execution-config/main?tags=pool-1,high-value" \
   -H "Content-Type: application/json" \
-  -d '{"keys": ["0x8021...8bbe"]}'
+  -d '["0x8021...8bbe"]'
 ```
 
 ---
@@ -161,7 +167,7 @@ curl -X GET "http://localhost:8080/commit-boost/v1/mux/pool-1"
 
 ## Protected API (Admin) - Vouch
 
-All admin endpoints require authentication (TBD).
+All admin endpoints require Bearer token authentication (see Authentication section).
 
 ### Proposers
 
@@ -177,19 +183,28 @@ Proposer-specific configurations for individual validator public keys.
 - `gas_limit` (optional): Filter by gas limit value
 - `min_value` (optional): Filter by minimum value
 - `reset_relays` (optional): Filter by reset_relays flag (true/false)
+- `relay_url` (optional): Filter by relay URL (prefix match)
+- `relay_min_value` (optional): Filter by relay min_value (exact match)
+- `relay_disabled` (optional): Filter by relay disabled status (true/false)
 - `limit` (optional): Number of results per page (default: 100)
 - `offset` (optional): Pagination offset (default: 0)
 
 **Response**: `200 OK`
 ```json
 {
-  "proposers": [
+  "data": [
     {
       "public_key": "0x8021...8bbe",
       "fee_recipient": "0x9999...1111",
       "gas_limit": null,
       "min_value": "0.5",
       "reset_relays": false,
+      "relays": {
+        "https://relay1.example.com/": {
+          "public_key": "0xac6e77...",
+          "disabled": false
+        }
+      },
       "created_at": "2025-01-09T10:00:00Z",
       "updated_at": "2025-01-09T10:00:00Z"
     }
@@ -210,6 +225,12 @@ GET /api/admin/vouch/proposers?min_value=0.5&reset_relays=true
 
 # Filter by public key prefix with pagination
 GET /api/admin/vouch/proposers?public_key=0x80&limit=50&offset=0
+
+# Filter by relay URL prefix
+GET /api/admin/vouch/proposers?relay_url=https://relay.flashbots
+
+# Filter by relay disabled status
+GET /api/admin/vouch/proposers?relay_disabled=true
 ```
 
 #### Get Proposer
@@ -283,30 +304,34 @@ GET /api/admin/vouch/proposers?public_key=0x80&limit=50&offset=0
 - `gas_limit` (optional): Filter by gas limit value
 - `min_value` (optional): Filter by minimum value
 - `active` (optional): Filter by active status (true/false)
+- `relay_url` (optional): Filter by relay URL (prefix match)
+- `relay_min_value` (optional): Filter by relay min_value (exact match)
 - `limit` (optional): Number of results per page (default: 100)
 - `offset` (optional): Pagination offset (default: 0)
 
 **Response**: `200 OK`
 ```json
 {
-  "configs": [
+  "data": [
     {
       "name": "main",
       "fee_recipient": "0x1234...5678",
       "gas_limit": "30000000",
       "min_value": "0.1",
       "active": true,
+      "relays": {
+        "https://relay1.example.com/": {
+          "public_key": "0xac6e77...",
+          "min_value": "0.2"
+        }
+      },
       "created_at": "2025-01-09T10:00:00Z",
       "updated_at": "2025-01-09T10:00:00Z"
-    },
-    {
-      "name": "testnet",
-      "fee_recipient": "0x9999...0000",
-      "active": true,
-      "created_at": "2025-01-08T15:00:00Z",
-      "updated_at": "2025-01-08T15:00:00Z"
     }
-  ]
+  ],
+  "total": 5,
+  "limit": 100,
+  "offset": 0
 }
 ```
 
@@ -320,6 +345,9 @@ GET /api/admin/vouch/configs/default?name=main
 
 # Filter by fee recipient
 GET /api/admin/vouch/configs/default?fee_recipient=0x1234...5678
+
+# Filter by relay URL prefix
+GET /api/admin/vouch/configs/default?relay_url=https://relay.flashbots
 ```
 
 #### Get Default Config
@@ -406,13 +434,16 @@ Pattern-based proposer configurations with regex matching and tags.
 - `gas_limit` (optional): Filter by gas limit value
 - `min_value` (optional): Filter by minimum value
 - `reset_relays` (optional): Filter by reset_relays flag (true/false)
+- `relay_url` (optional): Filter by relay URL (prefix match)
+- `relay_min_value` (optional): Filter by relay min_value (exact match)
+- `relay_disabled` (optional): Filter by relay disabled status (true/false)
 - `limit` (optional): Number of results per page (default: 100)
 - `offset` (optional): Pagination offset (default: 0)
 
 **Response**: `200 OK`
 ```json
 {
-  "configs": [
+  "data": [
     {
       "name": "pool1-mainnet",
       "pattern": "^Pool1/.*$",
@@ -423,17 +454,6 @@ Pattern-based proposer configurations with regex matching and tags.
       "reset_relays": true,
       "created_at": "2025-01-09T10:00:00Z",
       "updated_at": "2025-01-09T10:00:00Z"
-    },
-    {
-      "name": "pool1-backup",
-      "pattern": "^Pool1Backup/.*$",
-      "tags": ["pool-1", "backup"],
-      "fee_recipient": "0x8888...3333",
-      "gas_limit": null,
-      "min_value": "0.2",
-      "reset_relays": false,
-      "created_at": "2025-01-09T11:00:00Z",
-      "updated_at": "2025-01-09T11:00:00Z"
     }
   ],
   "total": 12,
@@ -441,6 +461,8 @@ Pattern-based proposer configurations with regex matching and tags.
   "offset": 0
 }
 ```
+
+**Note**: List items do not include relays. Use GET by name to retrieve relay configuration.
 
 **Filter Examples**:
 ```bash
@@ -455,6 +477,12 @@ GET /api/admin/vouch/proposer-patterns?pattern=Pool1
 
 # Filter by name prefix
 GET /api/admin/vouch/proposer-patterns?name=pool1
+
+# Filter by relay URL prefix
+GET /api/admin/vouch/proposer-patterns?relay_url=https://relay.flashbots
+
+# Filter by relay disabled status
+GET /api/admin/vouch/proposer-patterns?relay_disabled=true
 ```
 
 #### Get Proposer Pattern
@@ -529,7 +557,7 @@ GET /api/admin/vouch/proposer-patterns?name=pool1
 
 ## Protected API (Admin) - Commit-Boost
 
-All admin endpoints require authentication (TBD).
+All admin endpoints require Bearer token authentication (see Authentication section).
 
 ### Mux Configs
 
@@ -544,7 +572,7 @@ All admin endpoints require authentication (TBD).
 **Response**: `200 OK`
 ```json
 {
-  "mux_configs": [
+  "data": [
     {
       "name": "pool-1",
       "key_count": 150,
@@ -713,6 +741,7 @@ All admin endpoints require authentication (TBD).
    - **Numeric fields** (gas_limit, min_value): Exact match
    - **Boolean fields** (active, reset_relays): true/false values
    - **Array fields** (tags): Match if the item contains the specified tag
+   - **Relay filters** (relay_url, relay_min_value, relay_disabled): Filter by properties of associated relays
    - Multiple filters can be combined with AND logic
    - All filters are optional
    - Commit-Boost mux endpoints do not support filtering (simple list only)

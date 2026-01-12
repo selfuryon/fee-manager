@@ -74,6 +74,7 @@ CREATE TABLE vouch_proposer_pattern_relays (
     fee_recipient TEXT,
     gas_limit TEXT,
     min_value TEXT,
+    disabled BOOLEAN NOT NULL DEFAULT false,
     UNIQUE(pattern_name, url)
 );
 

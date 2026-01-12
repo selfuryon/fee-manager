@@ -26,6 +26,10 @@ pub struct DefaultConfigFilters {
     pub gas_limit: Option<String>,
     pub min_value: Option<String>,
     pub active: Option<bool>,
+    /// Filter by relay URL (prefix match)
+    pub relay_url: Option<String>,
+    /// Filter by relay min_value (exact match)
+    pub relay_min_value: Option<String>,
     #[serde(default = "default_limit")]
     pub limit: i64,
     #[serde(default)]
@@ -56,19 +60,32 @@ pub async fn list_default_configs(
     let mut conditions = Vec::new();
 
     if let Some(ref name) = filters.name {
-        conditions.push(format!("name LIKE '{}%'", name.replace('\'', "''")));
+        conditions.push(format!("c.name LIKE '{}%'", name.replace('\'', "''")));
     }
     if let Some(ref fr) = filters.fee_recipient {
-        conditions.push(format!("fee_recipient = '{}'", fr.replace('\'', "''")));
+        conditions.push(format!("c.fee_recipient = '{}'", fr.replace('\'', "''")));
     }
     if let Some(ref gl) = filters.gas_limit {
-        conditions.push(format!("gas_limit = '{}'", gl.replace('\'', "''")));
+        conditions.push(format!("c.gas_limit = '{}'", gl.replace('\'', "''")));
     }
     if let Some(ref mv) = filters.min_value {
-        conditions.push(format!("min_value = '{}'", mv.replace('\'', "''")));
+        conditions.push(format!("c.min_value = '{}'", mv.replace('\'', "''")));
     }
     if let Some(active) = filters.active {
-        conditions.push(format!("active = {}", if active { "true" } else { "false" }));
+        conditions.push(format!("c.active = {}", if active { "true" } else { "false" }));
+    }
+    // Relay filters using EXISTS subquery
+    if let Some(ref relay_url) = filters.relay_url {
+        conditions.push(format!(
+            "EXISTS (SELECT 1 FROM vouch_default_relays r WHERE r.config_name = c.name AND r.url LIKE '{}%')",
+            relay_url.replace('\'', "''")
+        ));
+    }
+    if let Some(ref relay_min_value) = filters.relay_min_value {
+        conditions.push(format!(
+            "EXISTS (SELECT 1 FROM vouch_default_relays r WHERE r.config_name = c.name AND r.min_value = '{}')",
+            relay_min_value.replace('\'', "''")
+        ));
     }
 
     let where_clause = if conditions.is_empty() {
@@ -78,7 +95,7 @@ pub async fn list_default_configs(
     };
 
     let count_sql = format!(
-        "SELECT COUNT(*) as count FROM vouch_default_configs {}",
+        "SELECT COUNT(*) as count FROM vouch_default_configs c {}",
         where_clause
     );
     let total: i64 = sqlx::query_scalar(&count_sql)
@@ -86,9 +103,9 @@ pub async fn list_default_configs(
         .await?;
 
     let data_sql = format!(
-        "SELECT name, fee_recipient, gas_limit, min_value, active, created_at, updated_at
-         FROM vouch_default_configs {}
-         ORDER BY name ASC
+        "SELECT c.name, c.fee_recipient, c.gas_limit, c.min_value, c.active, c.created_at, c.updated_at
+         FROM vouch_default_configs c {}
+         ORDER BY c.name ASC
          LIMIT {} OFFSET {}",
         where_clause, filters.limit, filters.offset
     );

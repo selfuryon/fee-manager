@@ -338,6 +338,110 @@ async fn test_get_execution_config_with_tags() {
 }
 
 // ============================================================================
+// Tag Ordering Tests
+// ============================================================================
+
+#[tokio::test]
+async fn test_execution_config_patterns_after_proposers_in_tag_order() {
+    let app = TestApp::get().await;
+    let id = TestApp::unique_id();
+    let config_name = format!("test_order_{}", id);
+    let pattern_lido = format!("pattern_lido_{}", id);
+    let pattern_dev = format!("pattern_dev_{}", id);
+    let pubkey = TestApp::test_bls_pubkey(&format!("order{}", id));
+
+    // Create default config
+    app.client()
+        .post(&format!("{}/api/admin/vouch/configs/default", app.address))
+        .json(&json!({
+            "name": config_name,
+            "fee_recipient": "0xdef1def1def1def1def1def1def1def1def1def1",
+            "active": true
+        }))
+        .send()
+        .await
+        .expect("Failed to create config");
+
+    // Create proposer
+    app.client()
+        .put(&format!("{}/api/admin/vouch/proposers/{}", app.address, pubkey))
+        .json(&json!({
+            "fee_recipient": "0x1111111111111111111111111111111111111111"
+        }))
+        .send()
+        .await
+        .expect("Failed to create proposer");
+
+    // Create pattern with "dev" tag
+    app.client()
+        .post(&format!("{}/api/admin/vouch/proposer-patterns", app.address))
+        .json(&json!({
+            "name": pattern_dev,
+            "pattern": "^dev/.*$",
+            "tags": ["dev"],
+            "fee_recipient": "0x2222222222222222222222222222222222222222"
+        }))
+        .send()
+        .await
+        .expect("Failed to create dev pattern");
+
+    // Create pattern with "lido" tag
+    app.client()
+        .post(&format!("{}/api/admin/vouch/proposer-patterns", app.address))
+        .json(&json!({
+            "name": pattern_lido,
+            "pattern": "^lido/.*$",
+            "tags": ["lido"],
+            "fee_recipient": "0x3333333333333333333333333333333333333333"
+        }))
+        .send()
+        .await
+        .expect("Failed to create lido pattern");
+
+    // Request with tags=lido,dev - lido should come before dev
+    let response = app
+        .client()
+        .post(&format!("{}/vouch/v2/execution-config/{}?tags=lido,dev", app.address, config_name))
+        .json(&json!([pubkey]))
+        .send()
+        .await
+        .expect("Failed to send request");
+
+    assert_eq!(response.status(), 200);
+    let body: ExecutionConfigResponse = response.json().await.expect("Failed to parse JSON");
+
+    let proposers = body.proposers.expect("Should have proposers");
+
+    // First should be the regular proposer (not a pattern)
+    assert_eq!(proposers[0].proposer, pubkey, "Proposer should come first");
+
+    // Find positions of our patterns
+    let lido_pos = proposers.iter().position(|p| p.proposer == "^lido/.*$");
+    let dev_pos = proposers.iter().position(|p| p.proposer == "^dev/.*$");
+
+    assert!(lido_pos.is_some(), "Lido pattern should be present");
+    assert!(dev_pos.is_some(), "Dev pattern should be present");
+
+    // Both patterns should come after the proposer
+    assert!(lido_pos.unwrap() > 0, "Lido pattern should come after proposer");
+    assert!(dev_pos.unwrap() > 0, "Dev pattern should come after proposer");
+
+    // Lido should come before dev (matches tag order: lido,dev)
+    assert!(
+        lido_pos.unwrap() < dev_pos.unwrap(),
+        "Lido pattern (pos {}) should come before dev pattern (pos {}) per tag order",
+        lido_pos.unwrap(),
+        dev_pos.unwrap()
+    );
+
+    // Cleanup
+    delete_proposer(app, &pubkey).await;
+    delete_pattern(app, &pattern_lido).await;
+    delete_pattern(app, &pattern_dev).await;
+    delete_config(app, &config_name).await;
+}
+
+// ============================================================================
 // Multiple Proposers Test
 // ============================================================================
 

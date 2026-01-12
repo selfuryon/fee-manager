@@ -82,10 +82,10 @@ pub async fn get_execution_config(
         .await?;
 
         for proposer in proposer_configs {
-            // Load proposer's relays
+            // Load proposer's relays (including disabled - Vouch handles disabled flag)
             let proposer_relays = sqlx::query_as::<_, crate::models::VouchProposerRelay>(
                 "SELECT id, proposer_public_key, url, public_key, fee_recipient, gas_limit, min_value, disabled
-                 FROM vouch_proposer_relays WHERE proposer_public_key = $1 AND disabled = false",
+                 FROM vouch_proposer_relays WHERE proposer_public_key = $1",
             )
             .bind(&proposer.public_key)
             .fetch_all(&state.pool)
@@ -101,6 +101,7 @@ pub async fn get_execution_config(
                             fee_recipient: r.fee_recipient,
                             gas_limit: r.gas_limit,
                             min_value: r.min_value,
+                            disabled: r.disabled,
                         },
                     )
                 })
@@ -126,11 +127,12 @@ pub async fn get_execution_config(
     }
 
     // 4. Load pattern-based configs by tags (OR logic)
+    // Patterns are sorted by the order of their first matching tag in the request
     if let Some(tags_str) = &query.tags {
         let tags: Vec<&str> = tags_str.split(',').map(|s| s.trim()).collect();
 
         if !tags.is_empty() {
-            let pattern_configs = sqlx::query_as::<_, crate::models::VouchProposerPattern>(
+            let mut pattern_configs = sqlx::query_as::<_, crate::models::VouchProposerPattern>(
                 "SELECT name, pattern, tags, fee_recipient, gas_limit, min_value, reset_relays, created_at, updated_at
                  FROM vouch_proposer_patterns WHERE tags && $1",
             )
@@ -138,10 +140,19 @@ pub async fn get_execution_config(
             .fetch_all(&state.pool)
             .await?;
 
+            // Sort patterns by the position of their first matching tag in the request
+            pattern_configs.sort_by_key(|p| {
+                p.tags
+                    .iter()
+                    .filter_map(|t| tags.iter().position(|&req_tag| req_tag == t))
+                    .min()
+                    .unwrap_or(usize::MAX)
+            });
+
             for pattern in pattern_configs {
-                // Load pattern's relays
+                // Load pattern's relays (including disabled - Vouch handles disabled flag)
                 let pattern_relays = sqlx::query_as::<_, crate::models::VouchProposerPatternRelay>(
-                    "SELECT id, pattern_name, url, public_key, fee_recipient, gas_limit, min_value
+                    "SELECT id, pattern_name, url, public_key, fee_recipient, gas_limit, min_value, disabled
                      FROM vouch_proposer_pattern_relays WHERE pattern_name = $1",
                 )
                 .bind(&pattern.name)

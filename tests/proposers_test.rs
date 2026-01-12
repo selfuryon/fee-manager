@@ -427,3 +427,194 @@ async fn test_proposers_pagination() {
         delete_proposer(app, pubkey).await;
     }
 }
+
+// ============================================================================
+// Relay Filter Tests
+// ============================================================================
+
+#[tokio::test]
+async fn test_filter_proposers_by_relay_url() {
+    let app = TestApp::get().await;
+    let id = TestApp::unique_id();
+    let prefix = format!("ff{}", id);
+
+    let pubkey_with_relay = TestApp::test_bls_pubkey(&format!("{}01", prefix));
+    let pubkey_without_relay = TestApp::test_bls_pubkey(&format!("{}02", prefix));
+
+    // Create proposer with relay
+    app.client()
+        .put(&format!("{}/api/admin/vouch/proposers/{}", app.address, pubkey_with_relay))
+        .json(&json!({
+            "relays": {
+                "https://flashbots.example.com": {
+                    "public_key": "0x8b5d2e73e2a3a55c6c87b8b6eb92e0149a125c852751db1422fa951e42a09b82c142c3ea98d0d9930b056a3bc9896b8f"
+                }
+            }
+        }))
+        .send()
+        .await
+        .expect("Failed to create proposer with relay");
+
+    // Create proposer without relay
+    app.client()
+        .put(&format!("{}/api/admin/vouch/proposers/{}", app.address, pubkey_without_relay))
+        .json(&json!({}))
+        .send()
+        .await
+        .expect("Failed to create proposer without relay");
+
+    // Filter by relay_url prefix
+    let response = app
+        .client()
+        .get(&format!(
+            "{}/api/admin/vouch/proposers?public_key=0xdead{}&relay_url=https://flashbots",
+            app.address, prefix
+        ))
+        .send()
+        .await
+        .expect("Failed to send request");
+
+    assert_eq!(response.status(), 200);
+    let body: PaginatedResponse<ProposerListItem> = response.json().await.unwrap();
+    assert_eq!(body.data.len(), 1);
+    assert!(body.data[0].public_key.contains("01"));
+
+    // Cleanup
+    delete_proposer(app, &pubkey_with_relay).await;
+    delete_proposer(app, &pubkey_without_relay).await;
+}
+
+#[tokio::test]
+async fn test_filter_proposers_by_relay_min_value() {
+    let app = TestApp::get().await;
+    let id = TestApp::unique_id();
+    let prefix = format!("a0{}", id);
+
+    let pubkey_with_min = TestApp::test_bls_pubkey(&format!("{}01", prefix));
+    let pubkey_without_min = TestApp::test_bls_pubkey(&format!("{}02", prefix));
+
+    // Create proposer with relay that has min_value
+    app.client()
+        .put(&format!("{}/api/admin/vouch/proposers/{}", app.address, pubkey_with_min))
+        .json(&json!({
+            "relays": {
+                "https://relay1.example.com": {
+                    "public_key": "0x8b5d2e73e2a3a55c6c87b8b6eb92e0149a125c852751db1422fa951e42a09b82c142c3ea98d0d9930b056a3bc9896b8f",
+                    "min_value": "99000000000000000"
+                }
+            }
+        }))
+        .send()
+        .await
+        .expect("Failed to create proposer with relay min_value");
+
+    // Create proposer with relay without min_value
+    app.client()
+        .put(&format!("{}/api/admin/vouch/proposers/{}", app.address, pubkey_without_min))
+        .json(&json!({
+            "relays": {
+                "https://relay2.example.com": {
+                    "public_key": "0xac6e77dfe25ecd6110b8e780608cce0dab71fdd5ebea22a16c0205200f2f8e2e3ad3b71d3499c54ad14d6c21b41a37ae"
+                }
+            }
+        }))
+        .send()
+        .await
+        .expect("Failed to create proposer without relay min_value");
+
+    // Filter by relay_min_value
+    let response = app
+        .client()
+        .get(&format!(
+            "{}/api/admin/vouch/proposers?public_key=0xdead{}&relay_min_value=99000000000000000",
+            app.address, prefix
+        ))
+        .send()
+        .await
+        .expect("Failed to send request");
+
+    assert_eq!(response.status(), 200);
+    let body: PaginatedResponse<ProposerListItem> = response.json().await.unwrap();
+    assert_eq!(body.data.len(), 1);
+    assert!(body.data[0].public_key.contains("01"));
+
+    // Cleanup
+    delete_proposer(app, &pubkey_with_min).await;
+    delete_proposer(app, &pubkey_without_min).await;
+}
+
+#[tokio::test]
+async fn test_filter_proposers_by_relay_disabled() {
+    let app = TestApp::get().await;
+    let id = TestApp::unique_id();
+    let prefix = format!("b1{}", id);
+
+    let pubkey_disabled = TestApp::test_bls_pubkey(&format!("{}01", prefix));
+    let pubkey_enabled = TestApp::test_bls_pubkey(&format!("{}02", prefix));
+
+    // Create proposer with disabled relay
+    app.client()
+        .put(&format!("{}/api/admin/vouch/proposers/{}", app.address, pubkey_disabled))
+        .json(&json!({
+            "relays": {
+                "https://relay1.example.com": {
+                    "public_key": "0x8b5d2e73e2a3a55c6c87b8b6eb92e0149a125c852751db1422fa951e42a09b82c142c3ea98d0d9930b056a3bc9896b8f",
+                    "disabled": true
+                }
+            }
+        }))
+        .send()
+        .await
+        .expect("Failed to create proposer with disabled relay");
+
+    // Create proposer with enabled relay
+    app.client()
+        .put(&format!("{}/api/admin/vouch/proposers/{}", app.address, pubkey_enabled))
+        .json(&json!({
+            "relays": {
+                "https://relay2.example.com": {
+                    "public_key": "0xac6e77dfe25ecd6110b8e780608cce0dab71fdd5ebea22a16c0205200f2f8e2e3ad3b71d3499c54ad14d6c21b41a37ae",
+                    "disabled": false
+                }
+            }
+        }))
+        .send()
+        .await
+        .expect("Failed to create proposer with enabled relay");
+
+    // Filter by relay_disabled=true
+    let response = app
+        .client()
+        .get(&format!(
+            "{}/api/admin/vouch/proposers?public_key=0xdead{}&relay_disabled=true",
+            app.address, prefix
+        ))
+        .send()
+        .await
+        .expect("Failed to send request");
+
+    assert_eq!(response.status(), 200);
+    let body: PaginatedResponse<ProposerListItem> = response.json().await.unwrap();
+    assert_eq!(body.data.len(), 1);
+    assert!(body.data[0].public_key.contains("01"));
+
+    // Filter by relay_disabled=false
+    let response = app
+        .client()
+        .get(&format!(
+            "{}/api/admin/vouch/proposers?public_key=0xdead{}&relay_disabled=false",
+            app.address, prefix
+        ))
+        .send()
+        .await
+        .expect("Failed to send request");
+
+    assert_eq!(response.status(), 200);
+    let body: PaginatedResponse<ProposerListItem> = response.json().await.unwrap();
+    assert_eq!(body.data.len(), 1);
+    assert!(body.data[0].public_key.contains("02"));
+
+    // Cleanup
+    delete_proposer(app, &pubkey_disabled).await;
+    delete_proposer(app, &pubkey_enabled).await;
+}

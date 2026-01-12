@@ -489,3 +489,123 @@ async fn test_pagination() {
         delete_config(app, name).await;
     }
 }
+
+// ============================================================================
+// Relay Filter Tests
+// ============================================================================
+
+#[tokio::test]
+async fn test_filter_by_relay_url() {
+    let app = TestApp::get().await;
+    let prefix = TestApp::unique_id();
+    let name_with_relay = format!("test_relay_url_{}_with", prefix);
+    let name_without_relay = format!("test_relay_url_{}_without", prefix);
+
+    // Create config with relay
+    app.client()
+        .post(&format!("{}/api/admin/vouch/configs/default", app.address))
+        .json(&json!({
+            "name": name_with_relay,
+            "active": true,
+            "relays": {
+                "https://flashbots.example.com": {
+                    "public_key": "0x8b5d2e73e2a3a55c6c87b8b6eb92e0149a125c852751db1422fa951e42a09b82c142c3ea98d0d9930b056a3bc9896b8f"
+                }
+            }
+        }))
+        .send()
+        .await
+        .expect("Failed to create config with relay");
+
+    // Create config without relay
+    app.client()
+        .post(&format!("{}/api/admin/vouch/configs/default", app.address))
+        .json(&json!({
+            "name": name_without_relay,
+            "active": true
+        }))
+        .send()
+        .await
+        .expect("Failed to create config without relay");
+
+    // Filter by relay_url prefix
+    let response = app
+        .client()
+        .get(&format!(
+            "{}/api/admin/vouch/configs/default?name=test_relay_url_{}&relay_url=https://flashbots",
+            app.address, prefix
+        ))
+        .send()
+        .await
+        .expect("Failed to send request");
+
+    assert_eq!(response.status(), 200);
+    let body: PaginatedResponse<DefaultConfigListItem> = response.json().await.unwrap();
+    assert_eq!(body.data.len(), 1);
+    assert!(body.data[0].name.contains("with"));
+
+    // Cleanup
+    delete_config(app, &name_with_relay).await;
+    delete_config(app, &name_without_relay).await;
+}
+
+#[tokio::test]
+async fn test_filter_by_relay_min_value() {
+    let app = TestApp::get().await;
+    let prefix = TestApp::unique_id();
+    let name_with_min = format!("test_relay_min_{}_with", prefix);
+    let name_without_min = format!("test_relay_min_{}_without", prefix);
+
+    // Create config with relay that has min_value
+    app.client()
+        .post(&format!("{}/api/admin/vouch/configs/default", app.address))
+        .json(&json!({
+            "name": name_with_min,
+            "active": true,
+            "relays": {
+                "https://relay1.example.com": {
+                    "public_key": "0x8b5d2e73e2a3a55c6c87b8b6eb92e0149a125c852751db1422fa951e42a09b82c142c3ea98d0d9930b056a3bc9896b8f",
+                    "min_value": "50000000000000000"
+                }
+            }
+        }))
+        .send()
+        .await
+        .expect("Failed to create config with relay min_value");
+
+    // Create config with relay without min_value
+    app.client()
+        .post(&format!("{}/api/admin/vouch/configs/default", app.address))
+        .json(&json!({
+            "name": name_without_min,
+            "active": true,
+            "relays": {
+                "https://relay2.example.com": {
+                    "public_key": "0xac6e77dfe25ecd6110b8e780608cce0dab71fdd5ebea22a16c0205200f2f8e2e3ad3b71d3499c54ad14d6c21b41a37ae"
+                }
+            }
+        }))
+        .send()
+        .await
+        .expect("Failed to create config without relay min_value");
+
+    // Filter by relay_min_value
+    let response = app
+        .client()
+        .get(&format!(
+            "{}/api/admin/vouch/configs/default?name=test_relay_min_{}&relay_min_value=50000000000000000",
+            app.address, prefix
+        ))
+        .send()
+        .await
+        .expect("Failed to send request");
+
+    assert_eq!(response.status(), 200);
+    let body: PaginatedResponse<DefaultConfigListItem> = response.json().await.unwrap();
+    assert_eq!(body.data.len(), 1);
+    assert!(body.data[0].name.contains("with"));
+
+    // Cleanup
+    delete_config(app, &name_with_min).await;
+    delete_config(app, &name_without_min).await;
+}

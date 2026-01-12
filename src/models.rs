@@ -83,6 +83,7 @@ pub struct VouchProposerPatternRelay {
     pub fee_recipient: Option<EthAddress>,
     pub gas_limit: Option<String>,
     pub min_value: Option<String>,
+    pub disabled: bool,
 }
 
 // ============================================================================

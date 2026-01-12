@@ -26,6 +26,12 @@ pub struct ProposerFilters {
     pub gas_limit: Option<String>,
     pub min_value: Option<String>,
     pub reset_relays: Option<bool>,
+    /// Filter by relay URL (prefix match)
+    pub relay_url: Option<String>,
+    /// Filter by relay min_value (exact match)
+    pub relay_min_value: Option<String>,
+    /// Filter by relay disabled status
+    pub relay_disabled: Option<bool>,
     #[serde(default = "default_limit")]
     pub limit: i64,
     #[serde(default)]
@@ -57,21 +63,40 @@ pub async fn list_proposers(
     let mut conditions = Vec::new();
 
     if let Some(ref pk) = filters.public_key {
-        conditions.push(format!("public_key LIKE '{}%'", pk.replace('\'', "''")));
+        conditions.push(format!("p.public_key LIKE '{}%'", pk.replace('\'', "''")));
     }
     if let Some(ref fr) = filters.fee_recipient {
-        conditions.push(format!("fee_recipient = '{}'", fr.replace('\'', "''")));
+        conditions.push(format!("p.fee_recipient = '{}'", fr.replace('\'', "''")));
     }
     if let Some(ref gl) = filters.gas_limit {
-        conditions.push(format!("gas_limit = '{}'", gl.replace('\'', "''")));
+        conditions.push(format!("p.gas_limit = '{}'", gl.replace('\'', "''")));
     }
     if let Some(ref mv) = filters.min_value {
-        conditions.push(format!("min_value = '{}'", mv.replace('\'', "''")));
+        conditions.push(format!("p.min_value = '{}'", mv.replace('\'', "''")));
     }
     if let Some(rr) = filters.reset_relays {
         conditions.push(format!(
-            "reset_relays = {}",
+            "p.reset_relays = {}",
             if rr { "true" } else { "false" }
+        ));
+    }
+    // Relay filters using EXISTS subquery
+    if let Some(ref relay_url) = filters.relay_url {
+        conditions.push(format!(
+            "EXISTS (SELECT 1 FROM vouch_proposer_relays r WHERE r.proposer_public_key = p.public_key AND r.url LIKE '{}%')",
+            relay_url.replace('\'', "''")
+        ));
+    }
+    if let Some(ref relay_min_value) = filters.relay_min_value {
+        conditions.push(format!(
+            "EXISTS (SELECT 1 FROM vouch_proposer_relays r WHERE r.proposer_public_key = p.public_key AND r.min_value = '{}')",
+            relay_min_value.replace('\'', "''")
+        ));
+    }
+    if let Some(relay_disabled) = filters.relay_disabled {
+        conditions.push(format!(
+            "EXISTS (SELECT 1 FROM vouch_proposer_relays r WHERE r.proposer_public_key = p.public_key AND r.disabled = {})",
+            if relay_disabled { "true" } else { "false" }
         ));
     }
 
@@ -82,16 +107,16 @@ pub async fn list_proposers(
     };
 
     // Count query
-    let count_sql = format!("SELECT COUNT(*) as count FROM vouch_proposers {}", where_clause);
+    let count_sql = format!("SELECT COUNT(*) as count FROM vouch_proposers p {}", where_clause);
     let total: i64 = sqlx::query_scalar(&count_sql)
         .fetch_one(&state.pool)
         .await?;
 
     // Data query
     let data_sql = format!(
-        "SELECT public_key, fee_recipient, gas_limit, min_value, reset_relays, created_at, updated_at
-         FROM vouch_proposers {}
-         ORDER BY created_at DESC
+        "SELECT p.public_key, p.fee_recipient, p.gas_limit, p.min_value, p.reset_relays, p.created_at, p.updated_at
+         FROM vouch_proposers p {}
+         ORDER BY p.created_at DESC
          LIMIT {} OFFSET {}",
         where_clause, filters.limit, filters.offset
     );

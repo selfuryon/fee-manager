@@ -4,7 +4,7 @@ use crate::audit_log;
 use crate::errors::ApiError;
 use crate::schema::{
     CreateProposerPatternRequest, PaginatedResponse, ProposerPatternListItem,
-    ProposerPatternResponse, RelayConfig, UpdateProposerPatternRequest,
+    ProposerPatternResponse, ProposerRelayConfig, UpdateProposerPatternRequest,
 };
 use crate::AppState;
 use axum::{
@@ -28,6 +28,12 @@ pub struct ProposerPatternFilters {
     pub gas_limit: Option<String>,
     pub min_value: Option<String>,
     pub reset_relays: Option<bool>,
+    /// Filter by relay URL (prefix match)
+    pub relay_url: Option<String>,
+    /// Filter by relay min_value (exact match)
+    pub relay_min_value: Option<String>,
+    /// Filter by relay disabled status
+    pub relay_disabled: Option<bool>,
     #[serde(default = "default_limit")]
     pub limit: i64,
     #[serde(default)]
@@ -58,27 +64,46 @@ pub async fn list_proposer_patterns(
     let mut conditions = Vec::new();
 
     if let Some(ref name) = filters.name {
-        conditions.push(format!("name LIKE '{}%'", name.replace('\'', "''")));
+        conditions.push(format!("p.name LIKE '{}%'", name.replace('\'', "''")));
     }
     if let Some(ref pattern) = filters.pattern {
-        conditions.push(format!("pattern LIKE '%{}%'", pattern.replace('\'', "''")));
+        conditions.push(format!("p.pattern LIKE '%{}%'", pattern.replace('\'', "''")));
     }
     if let Some(ref tag) = filters.tag {
-        conditions.push(format!("'{}' = ANY(tags)", tag.replace('\'', "''")));
+        conditions.push(format!("'{}' = ANY(p.tags)", tag.replace('\'', "''")));
     }
     if let Some(ref fr) = filters.fee_recipient {
-        conditions.push(format!("fee_recipient = '{}'", fr.replace('\'', "''")));
+        conditions.push(format!("p.fee_recipient = '{}'", fr.replace('\'', "''")));
     }
     if let Some(ref gl) = filters.gas_limit {
-        conditions.push(format!("gas_limit = '{}'", gl.replace('\'', "''")));
+        conditions.push(format!("p.gas_limit = '{}'", gl.replace('\'', "''")));
     }
     if let Some(ref mv) = filters.min_value {
-        conditions.push(format!("min_value = '{}'", mv.replace('\'', "''")));
+        conditions.push(format!("p.min_value = '{}'", mv.replace('\'', "''")));
     }
     if let Some(rr) = filters.reset_relays {
         conditions.push(format!(
-            "reset_relays = {}",
+            "p.reset_relays = {}",
             if rr { "true" } else { "false" }
+        ));
+    }
+    // Relay filters using EXISTS subquery
+    if let Some(ref relay_url) = filters.relay_url {
+        conditions.push(format!(
+            "EXISTS (SELECT 1 FROM vouch_proposer_pattern_relays r WHERE r.pattern_name = p.name AND r.url LIKE '{}%')",
+            relay_url.replace('\'', "''")
+        ));
+    }
+    if let Some(ref relay_min_value) = filters.relay_min_value {
+        conditions.push(format!(
+            "EXISTS (SELECT 1 FROM vouch_proposer_pattern_relays r WHERE r.pattern_name = p.name AND r.min_value = '{}')",
+            relay_min_value.replace('\'', "''")
+        ));
+    }
+    if let Some(relay_disabled) = filters.relay_disabled {
+        conditions.push(format!(
+            "EXISTS (SELECT 1 FROM vouch_proposer_pattern_relays r WHERE r.pattern_name = p.name AND r.disabled = {})",
+            if relay_disabled { "true" } else { "false" }
         ));
     }
 
@@ -89,7 +114,7 @@ pub async fn list_proposer_patterns(
     };
 
     let count_sql = format!(
-        "SELECT COUNT(*) as count FROM vouch_proposer_patterns {}",
+        "SELECT COUNT(*) as count FROM vouch_proposer_patterns p {}",
         where_clause
     );
     let total: i64 = sqlx::query_scalar(&count_sql)
@@ -97,9 +122,9 @@ pub async fn list_proposer_patterns(
         .await?;
 
     let data_sql = format!(
-        "SELECT name, pattern, tags, fee_recipient, gas_limit, min_value, reset_relays, created_at, updated_at
-         FROM vouch_proposer_patterns {}
-         ORDER BY name ASC
+        "SELECT p.name, p.pattern, p.tags, p.fee_recipient, p.gas_limit, p.min_value, p.reset_relays, p.created_at, p.updated_at
+         FROM vouch_proposer_patterns p {}
+         ORDER BY p.name ASC
          LIMIT {} OFFSET {}",
         where_clause, filters.limit, filters.offset
     );
@@ -148,14 +173,14 @@ pub async fn get_proposer_pattern(
     .ok_or_else(|| ApiError::NotFound(format!("Proposer pattern '{}' not found", name)))?;
 
     let relays = sqlx::query_as::<_, crate::models::VouchProposerPatternRelay>(
-        "SELECT id, pattern_name, url, public_key, fee_recipient, gas_limit, min_value
+        "SELECT id, pattern_name, url, public_key, fee_recipient, gas_limit, min_value, disabled
          FROM vouch_proposer_pattern_relays WHERE pattern_name = $1",
     )
     .bind(&name)
     .fetch_all(&state.pool)
     .await?;
 
-    let relays_map: HashMap<String, RelayConfig> = relays
+    let relays_map: HashMap<String, ProposerRelayConfig> = relays
         .into_iter()
         .map(|r| (r.url.clone(), r.into()))
         .collect();
@@ -232,8 +257,8 @@ pub async fn create_proposer_pattern(
         for (url, relay) in relays {
             sqlx::query(
                 "INSERT INTO vouch_proposer_pattern_relays
-                 (pattern_name, url, public_key, fee_recipient, gas_limit, min_value)
-                 VALUES ($1, $2, $3, $4, $5, $6)",
+                 (pattern_name, url, public_key, fee_recipient, gas_limit, min_value, disabled)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7)",
             )
             .bind(&req.name)
             .bind(url)
@@ -241,6 +266,7 @@ pub async fn create_proposer_pattern(
             .bind(&relay.fee_recipient)
             .bind(&relay.gas_limit)
             .bind(&relay.min_value)
+            .bind(relay.disabled)
             .execute(&mut *tx)
             .await?;
         }
@@ -273,14 +299,14 @@ pub async fn create_proposer_pattern(
     .await?;
 
     let relays = sqlx::query_as::<_, crate::models::VouchProposerPatternRelay>(
-        "SELECT id, pattern_name, url, public_key, fee_recipient, gas_limit, min_value
+        "SELECT id, pattern_name, url, public_key, fee_recipient, gas_limit, min_value, disabled
          FROM vouch_proposer_pattern_relays WHERE pattern_name = $1",
     )
     .bind(&req.name)
     .fetch_all(&state.pool)
     .await?;
 
-    let relays_map: HashMap<String, RelayConfig> = relays
+    let relays_map: HashMap<String, ProposerRelayConfig> = relays
         .into_iter()
         .map(|r| (r.url.clone(), r.into()))
         .collect();
@@ -413,8 +439,8 @@ pub async fn update_proposer_pattern(
         for (url, relay) in relays {
             sqlx::query(
                 "INSERT INTO vouch_proposer_pattern_relays
-                 (pattern_name, url, public_key, fee_recipient, gas_limit, min_value)
-                 VALUES ($1, $2, $3, $4, $5, $6)",
+                 (pattern_name, url, public_key, fee_recipient, gas_limit, min_value, disabled)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7)",
             )
             .bind(&name)
             .bind(url)
@@ -422,6 +448,7 @@ pub async fn update_proposer_pattern(
             .bind(&relay.fee_recipient)
             .bind(&relay.gas_limit)
             .bind(&relay.min_value)
+            .bind(relay.disabled)
             .execute(&mut *tx)
             .await?;
         }
@@ -454,14 +481,14 @@ pub async fn update_proposer_pattern(
     .await?;
 
     let relays = sqlx::query_as::<_, crate::models::VouchProposerPatternRelay>(
-        "SELECT id, pattern_name, url, public_key, fee_recipient, gas_limit, min_value
+        "SELECT id, pattern_name, url, public_key, fee_recipient, gas_limit, min_value, disabled
          FROM vouch_proposer_pattern_relays WHERE pattern_name = $1",
     )
     .bind(&name)
     .fetch_all(&state.pool)
     .await?;
 
-    let relays_map: HashMap<String, RelayConfig> = relays
+    let relays_map: HashMap<String, ProposerRelayConfig> = relays
         .into_iter()
         .map(|r| (r.url.clone(), r.into()))
         .collect();

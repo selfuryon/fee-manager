@@ -55,70 +55,66 @@ INSERT INTO hoodi_relays VALUES
 -- 5 Default Configs
 -- ============================================================================
 INSERT INTO vouch_default_configs (name, fee_recipient, gas_limit, min_value, active) VALUES
-    ('mainnet-default', '0x388c818ca8b9251b393131c08a736a67ccb19297', '30000000', '10000000000000000', true),
-    ('mainnet-mev-boost', '0x5e8422345238f34275888049021821e8e08caa1f', '36000000', '50000000000000000', true),
-    ('hoodi-testnet', '0x1234567890abcdef1234567890abcdef12345678', '30000000', NULL, true),
-    ('mainnet-conservative', '0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef', '25000000', '100000000000000000', true),
-    ('mainnet-archive', '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd', '30000000', '1000000000000000', false);
+    ('mainnet', '0x388c818ca8b9251b393131c08a736a67ccb19297', '30000000', '10000000000000000', true),
+    ('mainnet-lido', '0x5e8422345238f34275888049021821e8e08caa1f', '36000000', '50000000000000000', true),
+    ('hoodi', '0x1234567890abcdef1234567890abcdef12345678', '30000000', NULL, true),
+    ('hoodi-lido', '0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef', '25000000', '100000000000000000', true),
+    ('hoodi-test', '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd', '30000000', '1000000000000000', false);
 
--- Relays for mainnet-default (all mainnet relays)
+-- Relays for mainnet (all mainnet relays)
 INSERT INTO vouch_default_relays (config_name, url, public_key)
-SELECT 'mainnet-default', url, public_key FROM mainnet_relays;
+SELECT 'mainnet', url, public_key FROM mainnet_relays;
 
--- Relays for mainnet-mev-boost (only flashbots, ultrasound, bloxroute)
+-- Relays for mainnet-lido (only flashbots, ultrasound, bloxroute)
 INSERT INTO vouch_default_relays (config_name, url, public_key)
-SELECT 'mainnet-mev-boost', url, public_key FROM mainnet_relays
+SELECT 'mainnet-lido', url, public_key FROM mainnet_relays
 WHERE url LIKE '%flashbots%' OR url LIKE '%ultrasound%' OR url LIKE '%bloxroute%';
 
--- Relays for hoodi-testnet (all hoodi relays)
+-- Relays for hoodi (all hoodi relays)
 INSERT INTO vouch_default_relays (config_name, url, public_key)
-SELECT 'hoodi-testnet', url, public_key FROM hoodi_relays;
+SELECT 'hoodi', url, public_key FROM hoodi_relays;
 
--- Relays for mainnet-conservative (only flashbots and regulated bloxroute)
+-- Relays for hoodi-lido (only flashbots and regulated bloxroute)
 INSERT INTO vouch_default_relays (config_name, url, public_key)
-SELECT 'mainnet-conservative', url, public_key FROM mainnet_relays
+SELECT 'hoodi-lido', url, public_key FROM mainnet_relays
 WHERE url LIKE '%flashbots%' OR url LIKE '%regulated%';
 
--- Relays for mainnet-archive (flashbots, titan, eden)
+-- Relays for hoodi-test(flashbots, titan, eden)
 INSERT INTO vouch_default_relays (config_name, url, public_key)
-SELECT 'mainnet-archive', url, public_key FROM mainnet_relays
+SELECT 'hoodi-test', url, public_key FROM mainnet_relays
 WHERE url LIKE '%flashbots%' OR url LIKE '%titan%' OR url LIKE '%eden%';
 
 -- ============================================================================
--- 5 Proposer Patterns
+-- 5 Proposer Patterns (50% have relays = 2-3 patterns)
+-- Patterns match wallet naming conventions (e.g., "lido/validator-1")
 -- ============================================================================
 INSERT INTO vouch_proposer_patterns (name, pattern, tags, fee_recipient, gas_limit, min_value, reset_relays) VALUES
-    ('lido-validators', '^0x8[0-9a-f]{94}$', ARRAY['lido', 'liquid-staking'], '0x388c818ca8b9251b393131c08a736a67ccb19297', '30000000', '20000000000000000', false),
-    ('rocketpool-nodes', '^0x9[0-9a-f]{94}$', ARRAY['rocketpool', 'decentralized'], '0x5e8422345238f34275888049021821e8e08caa1f', '32000000', '15000000000000000', false),
-    ('coinbase-cloud', '^0xa[0-9a-f]{94}$', ARRAY['coinbase', 'institutional'], '0xc01ba5ec10daddee550000000000000000000000', '28000000', '50000000000000000', true),
-    ('solo-stakers', '^0xb[0-9a-f]{94}$', ARRAY['solo', 'home-staker'], NULL, '30000000', '5000000000000000', false),
-    ('testnet-validators', '^0x[0-9a-f]{96}$', ARRAY['testnet', 'hoodi'], '0x1234567890abcdef1234567890abcdef12345678', '30000000', NULL, true);
+    ('lido', '^lido/.*$', ARRAY['lido', 'liquid-staking'], '0x388c818ca8b9251b393131c08a736a67ccb19297', '30000000', '20000000000000000', false),
+    ('dev', '^dev/.*$', ARRAY['dev', 'development'], '0x5e8422345238f34275888049021821e8e08caa1f', '32000000', '15000000000000000', false),
+    ('prod', '^prod/.*$', ARRAY['prod', 'production'], '0xc01ba5ec10daddee550000000000000000000000', '28000000', '50000000000000000', true),
+    ('test', '^test/.*$', ARRAY['test', 'testing'], NULL, '30000000', '5000000000000000', false),
+    ('etherfi', '^etherfi/.*$', ARRAY['etherfi', 'liquid-staking'], '0x1234567890abcdef1234567890abcdef12345678', '30000000', NULL, true);
 
--- Relays for lido-validators (top MEV relays)
+-- Relays for lido (top MEV relays) - HAS RELAYS
 INSERT INTO vouch_proposer_pattern_relays (pattern_name, url, public_key)
-SELECT 'lido-validators', url, public_key FROM mainnet_relays
+SELECT 'lido', url, public_key FROM mainnet_relays
 WHERE url LIKE '%flashbots%' OR url LIKE '%ultrasound%' OR url LIKE '%bloxroute.max%';
 
--- Relays for rocketpool-nodes (decentralized relays)
-INSERT INTO vouch_proposer_pattern_relays (pattern_name, url, public_key)
-SELECT 'rocketpool-nodes', url, public_key FROM mainnet_relays
-WHERE url LIKE '%ultrasound%' OR url LIKE '%aestus%' OR url LIKE '%agnostic%';
+-- dev - NO RELAYS (uses default)
 
--- Relays for coinbase-cloud (regulated only)
+-- Relays for prod (regulated only) - HAS RELAYS
 INSERT INTO vouch_proposer_pattern_relays (pattern_name, url, public_key)
-SELECT 'coinbase-cloud', url, public_key FROM mainnet_relays
+SELECT 'prod', url, public_key FROM mainnet_relays
 WHERE url LIKE '%regulated%' OR url LIKE '%flashbots%';
 
--- Relays for solo-stakers (all available)
-INSERT INTO vouch_proposer_pattern_relays (pattern_name, url, public_key)
-SELECT 'solo-stakers', url, public_key FROM mainnet_relays;
+-- test - NO RELAYS (uses default)
 
--- Relays for testnet-validators (hoodi relays)
+-- Relays for etherfi (hoodi relays) - HAS RELAYS
 INSERT INTO vouch_proposer_pattern_relays (pattern_name, url, public_key)
-SELECT 'testnet-validators', url, public_key FROM hoodi_relays;
+SELECT 'etherfi', url, public_key FROM hoodi_relays;
 
 -- ============================================================================
--- 1000 Validators (Proposers)
+-- 1000 Validators (Proposers) - only 5% have relays
 -- ============================================================================
 
 -- Create temp table with pre-generated validator keys
@@ -153,7 +149,8 @@ SELECT
     v.idx % 5 = 0
 FROM temp_validators v;
 
--- Add relays for ALL validators (2-5 relays each based on idx pattern)
+-- Add relays for only 5% of validators (idx % 20 = 0, i.e. 50 out of 1000)
+-- Each gets 2-5 relays based on idx pattern
 INSERT INTO vouch_proposer_relays (proposer_public_key, url, public_key, fee_recipient, disabled)
 SELECT
     v.public_key,
@@ -161,13 +158,16 @@ SELECT
     r.public_key,
     -- 30% have custom fee_recipient per relay
     CASE WHEN v.idx % 10 < 3 THEN generate_eth_address() ELSE NULL END,
-    -- 5% of relays are disabled
-    v.idx % 20 = 0
+    -- 10% of relays are disabled
+    v.idx % 200 = 0
 FROM temp_validators v
 CROSS JOIN mainnet_relays r
 WHERE
-    -- Each validator gets 2-5 relays based on idx % 10 pattern
-    CASE v.idx % 10
+    -- Only 5% of validators get relays (every 20th)
+    v.idx % 20 = 0
+    AND
+    -- Each validator gets 2-5 relays based on pattern
+    CASE (v.idx / 20) % 5
         -- Pattern 0: flashbots + ultrasound + titan (3 relays)
         WHEN 0 THEN r.url LIKE '%flashbots%' OR r.url LIKE '%ultrasound%' OR r.url LIKE '%titan%'
         -- Pattern 1: flashbots + bloxroute (4 relays)
@@ -176,18 +176,8 @@ WHERE
         WHEN 2 THEN r.url LIKE '%ultrasound%' OR r.url LIKE '%aestus%' OR r.url LIKE '%agnostic%'
         -- Pattern 3: flashbots + eden + securerpc (3 relays)
         WHEN 3 THEN r.url LIKE '%flashbots%' OR r.url LIKE '%eden%' OR r.url LIKE '%securerpc%'
-        -- Pattern 4: all bloxroute + titan (3 relays)
-        WHEN 4 THEN r.url LIKE '%bloxroute%' OR r.url LIKE '%titan%'
-        -- Pattern 5: flashbots + ultrasound + bloxroute.max (3 relays)
-        WHEN 5 THEN r.url LIKE '%flashbots%' OR r.url LIKE '%ultrasound%' OR r.url LIKE '%bloxroute.max%'
-        -- Pattern 6: aestus + agnostic + eden + titan (4 relays)
-        WHEN 6 THEN r.url LIKE '%aestus%' OR r.url LIKE '%agnostic%' OR r.url LIKE '%eden%' OR r.url LIKE '%titan%'
-        -- Pattern 7: flashbots + regulated + securerpc (3 relays)
-        WHEN 7 THEN r.url LIKE '%flashbots%' OR r.url LIKE '%regulated%' OR r.url LIKE '%securerpc%'
-        -- Pattern 8: ultrasound + titan + eden (3 relays)
-        WHEN 8 THEN r.url LIKE '%ultrasound%' OR r.url LIKE '%titan%' OR r.url LIKE '%eden%'
-        -- Pattern 9: flashbots + ultrasound + aestus + agnostic (4 relays)
-        WHEN 9 THEN r.url LIKE '%flashbots%' OR r.url LIKE '%ultrasound%' OR r.url LIKE '%aestus%' OR r.url LIKE '%agnostic%'
+        -- Pattern 4: all mainnet relays (9 relays)
+        WHEN 4 THEN true
     END;
 
 -- ============================================================================

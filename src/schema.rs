@@ -13,6 +13,11 @@ use utoipa::ToSchema;
 // Common Types
 // ============================================================================
 
+/// Helper for skip_serializing_if
+fn is_false(v: &bool) -> bool {
+    !*v
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct RelayConfig {
     pub public_key: BlsPubkey,
@@ -22,6 +27,9 @@ pub struct RelayConfig {
     pub gas_limit: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub min_value: Option<String>,
+    /// Only serialized when true
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub disabled: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -33,7 +41,8 @@ pub struct ProposerRelayConfig {
     pub gas_limit: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub min_value: Option<String>,
-    #[serde(default)]
+    /// Only serialized when true
+    #[serde(default, skip_serializing_if = "is_false")]
     pub disabled: bool,
 }
 
@@ -182,7 +191,7 @@ pub struct ProposerPatternResponse {
     pub min_value: Option<String>,
     pub reset_relays: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub relays: Option<HashMap<String, RelayConfig>>,
+    pub relays: Option<HashMap<String, ProposerRelayConfig>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -218,7 +227,7 @@ pub struct CreateProposerPatternRequest {
     #[serde(default)]
     pub reset_relays: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub relays: Option<HashMap<String, RelayConfig>>,
+    pub relays: Option<HashMap<String, ProposerRelayConfig>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -236,7 +245,7 @@ pub struct UpdateProposerPatternRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reset_relays: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub relays: Option<HashMap<String, RelayConfig>>,
+    pub relays: Option<HashMap<String, ProposerRelayConfig>>,
 }
 
 // ============================================================================
@@ -377,12 +386,25 @@ impl From<VouchDefaultRelay> for RelayConfig {
             fee_recipient: relay.fee_recipient,
             gas_limit: relay.gas_limit,
             min_value: relay.min_value,
+            disabled: false, // Default relays don't have disabled
         }
     }
 }
 
 impl From<VouchProposerRelay> for ProposerRelayConfig {
     fn from(relay: VouchProposerRelay) -> Self {
+        Self {
+            public_key: relay.public_key,
+            fee_recipient: relay.fee_recipient,
+            gas_limit: relay.gas_limit,
+            min_value: relay.min_value,
+            disabled: relay.disabled,
+        }
+    }
+}
+
+impl From<VouchProposerPatternRelay> for ProposerRelayConfig {
+    fn from(relay: VouchProposerPatternRelay) -> Self {
         Self {
             public_key: relay.public_key,
             fee_recipient: relay.fee_recipient,
@@ -400,6 +422,7 @@ impl From<VouchProposerPatternRelay> for RelayConfig {
             fee_recipient: relay.fee_recipient,
             gas_limit: relay.gas_limit,
             min_value: relay.min_value,
+            disabled: relay.disabled,
         }
     }
 }

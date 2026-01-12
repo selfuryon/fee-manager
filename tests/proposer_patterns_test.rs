@@ -548,3 +548,201 @@ async fn test_proposer_patterns_pagination() {
         delete_pattern(app, name).await;
     }
 }
+
+// ============================================================================
+// Relay Filter Tests
+// ============================================================================
+
+#[tokio::test]
+async fn test_filter_patterns_by_relay_url() {
+    let app = TestApp::get().await;
+    let id = TestApp::unique_id();
+    let name_with_relay = format!("test_relay_url_{}_with", id);
+    let name_without_relay = format!("test_relay_url_{}_without", id);
+
+    // Create pattern with relay
+    app.client()
+        .post(&format!("{}/api/admin/vouch/proposer-patterns", app.address))
+        .json(&json!({
+            "name": name_with_relay,
+            "pattern": "^0xa[0-9a-f]{94}$",
+            "relays": {
+                "https://flashbots.example.com": {
+                    "public_key": "0x8b5d2e73e2a3a55c6c87b8b6eb92e0149a125c852751db1422fa951e42a09b82c142c3ea98d0d9930b056a3bc9896b8f"
+                }
+            }
+        }))
+        .send()
+        .await
+        .expect("Failed to create pattern with relay");
+
+    // Create pattern without relay
+    app.client()
+        .post(&format!("{}/api/admin/vouch/proposer-patterns", app.address))
+        .json(&json!({
+            "name": name_without_relay,
+            "pattern": "^0xb[0-9a-f]{94}$"
+        }))
+        .send()
+        .await
+        .expect("Failed to create pattern without relay");
+
+    // Filter by relay_url prefix
+    let response = app
+        .client()
+        .get(&format!(
+            "{}/api/admin/vouch/proposer-patterns?name=test_relay_url_{}&relay_url=https://flashbots",
+            app.address, id
+        ))
+        .send()
+        .await
+        .expect("Failed to send request");
+
+    assert_eq!(response.status(), 200);
+    let body: PaginatedResponse<ProposerPatternListItem> = response.json().await.unwrap();
+    assert_eq!(body.data.len(), 1);
+    assert!(body.data[0].name.contains("with"));
+
+    // Cleanup
+    delete_pattern(app, &name_with_relay).await;
+    delete_pattern(app, &name_without_relay).await;
+}
+
+#[tokio::test]
+async fn test_filter_patterns_by_relay_min_value() {
+    let app = TestApp::get().await;
+    let id = TestApp::unique_id();
+    let name_with_min = format!("test_relay_min_{}_with", id);
+    let name_without_min = format!("test_relay_min_{}_without", id);
+
+    // Create pattern with relay that has min_value
+    app.client()
+        .post(&format!("{}/api/admin/vouch/proposer-patterns", app.address))
+        .json(&json!({
+            "name": name_with_min,
+            "pattern": "^0xc[0-9a-f]{94}$",
+            "relays": {
+                "https://relay1.example.com": {
+                    "public_key": "0x8b5d2e73e2a3a55c6c87b8b6eb92e0149a125c852751db1422fa951e42a09b82c142c3ea98d0d9930b056a3bc9896b8f",
+                    "min_value": "77000000000000000"
+                }
+            }
+        }))
+        .send()
+        .await
+        .expect("Failed to create pattern with relay min_value");
+
+    // Create pattern with relay without min_value
+    app.client()
+        .post(&format!("{}/api/admin/vouch/proposer-patterns", app.address))
+        .json(&json!({
+            "name": name_without_min,
+            "pattern": "^0xd[0-9a-f]{94}$",
+            "relays": {
+                "https://relay2.example.com": {
+                    "public_key": "0xac6e77dfe25ecd6110b8e780608cce0dab71fdd5ebea22a16c0205200f2f8e2e3ad3b71d3499c54ad14d6c21b41a37ae"
+                }
+            }
+        }))
+        .send()
+        .await
+        .expect("Failed to create pattern without relay min_value");
+
+    // Filter by relay_min_value
+    let response = app
+        .client()
+        .get(&format!(
+            "{}/api/admin/vouch/proposer-patterns?name=test_relay_min_{}&relay_min_value=77000000000000000",
+            app.address, id
+        ))
+        .send()
+        .await
+        .expect("Failed to send request");
+
+    assert_eq!(response.status(), 200);
+    let body: PaginatedResponse<ProposerPatternListItem> = response.json().await.unwrap();
+    assert_eq!(body.data.len(), 1);
+    assert!(body.data[0].name.contains("with"));
+
+    // Cleanup
+    delete_pattern(app, &name_with_min).await;
+    delete_pattern(app, &name_without_min).await;
+}
+
+#[tokio::test]
+async fn test_filter_patterns_by_relay_disabled() {
+    let app = TestApp::get().await;
+    let id = TestApp::unique_id();
+    let name_disabled = format!("test_relay_dis_{}_disabled", id);
+    let name_enabled = format!("test_relay_dis_{}_enabled", id);
+
+    // Create pattern with disabled relay
+    app.client()
+        .post(&format!("{}/api/admin/vouch/proposer-patterns", app.address))
+        .json(&json!({
+            "name": name_disabled,
+            "pattern": "^0xe[0-9a-f]{94}$",
+            "relays": {
+                "https://relay1.example.com": {
+                    "public_key": "0x8b5d2e73e2a3a55c6c87b8b6eb92e0149a125c852751db1422fa951e42a09b82c142c3ea98d0d9930b056a3bc9896b8f",
+                    "disabled": true
+                }
+            }
+        }))
+        .send()
+        .await
+        .expect("Failed to create pattern with disabled relay");
+
+    // Create pattern with enabled relay
+    app.client()
+        .post(&format!("{}/api/admin/vouch/proposer-patterns", app.address))
+        .json(&json!({
+            "name": name_enabled,
+            "pattern": "^0xf[0-9a-f]{94}$",
+            "relays": {
+                "https://relay2.example.com": {
+                    "public_key": "0xac6e77dfe25ecd6110b8e780608cce0dab71fdd5ebea22a16c0205200f2f8e2e3ad3b71d3499c54ad14d6c21b41a37ae",
+                    "disabled": false
+                }
+            }
+        }))
+        .send()
+        .await
+        .expect("Failed to create pattern with enabled relay");
+
+    // Filter by relay_disabled=true
+    let response = app
+        .client()
+        .get(&format!(
+            "{}/api/admin/vouch/proposer-patterns?name=test_relay_dis_{}&relay_disabled=true",
+            app.address, id
+        ))
+        .send()
+        .await
+        .expect("Failed to send request");
+
+    assert_eq!(response.status(), 200);
+    let body: PaginatedResponse<ProposerPatternListItem> = response.json().await.unwrap();
+    assert_eq!(body.data.len(), 1);
+    assert!(body.data[0].name.contains("disabled"));
+
+    // Filter by relay_disabled=false
+    let response = app
+        .client()
+        .get(&format!(
+            "{}/api/admin/vouch/proposer-patterns?name=test_relay_dis_{}&relay_disabled=false",
+            app.address, id
+        ))
+        .send()
+        .await
+        .expect("Failed to send request");
+
+    assert_eq!(response.status(), 200);
+    let body: PaginatedResponse<ProposerPatternListItem> = response.json().await.unwrap();
+    assert_eq!(body.data.len(), 1);
+    assert!(body.data[0].name.contains("enabled"));
+
+    // Cleanup
+    delete_pattern(app, &name_disabled).await;
+    delete_pattern(app, &name_enabled).await;
+}

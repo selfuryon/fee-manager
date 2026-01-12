@@ -22,7 +22,7 @@ REST API for managing validator configurations for:
 Authorization: Bearer <token>
 ```
 
-The token is configured via the `AUTH_TOKEN` environment variable on the server.
+Tokens are stored in the database and managed via `/api/admin/tokens` endpoints. On first startup, a default token is auto-generated and printed to the logs.
 
 ---
 

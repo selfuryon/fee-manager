@@ -1,6 +1,5 @@
 # Rust
 /target
-.sqlx
 
 # AI
 .claude

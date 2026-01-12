@@ -4,6 +4,7 @@
   languages.rust.enable = true;
   packages = [
     pkgs.sqlx-cli
+    pkgs.pinact
   ];
   services.postgres = {
     enable = true;

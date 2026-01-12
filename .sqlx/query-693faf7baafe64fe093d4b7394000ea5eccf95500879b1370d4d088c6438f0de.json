@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE auth_tokens SET last_used_at = NOW() WHERE token_hash = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "693faf7baafe64fe093d4b7394000ea5eccf95500879b1370d4d088c6438f0de"
+}

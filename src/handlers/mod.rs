@@ -1,9 +1,9 @@
 // handlers/mod.rs - Main router and health endpoints
+use crate::AppState;
 use crate::auth;
 use crate::openapi;
-use crate::AppState;
 use axum::{
-    body::Body, http::Request, middleware, response::IntoResponse, routing::get, Json, Router,
+    Json, Router, body::Body, http::Request, middleware, response::IntoResponse, routing::get,
 };
 use serde::Serialize;
 use std::sync::Arc;

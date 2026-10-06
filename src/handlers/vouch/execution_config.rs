@@ -1,11 +1,11 @@
 // handlers/vouch/execution_config.rs - Public execution config endpoint
+use crate::AppState;
 use crate::addresses::BlsPubkey;
 use crate::errors::ApiError;
 use crate::schema::{ExecutionConfigResponse, ProposerEntry, RelayConfig};
-use crate::AppState;
 use axum::{
-    extract::{Path, Query, State},
     Json,
+    extract::{Path, Query, State},
 };
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -136,7 +136,7 @@ pub async fn get_execution_config(
                 "SELECT name, pattern, tags, fee_recipient, gas_limit, min_value, reset_relays, created_at, updated_at
                  FROM vouch_proposer_patterns WHERE tags && $1",
             )
-            .bind(&tags.iter().map(|s| s.to_string()).collect::<Vec<String>>())
+            .bind(tags.iter().map(|s| s.to_string()).collect::<Vec<String>>())
             .fetch_all(&state.pool)
             .await?;
 

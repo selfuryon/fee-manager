@@ -1,6 +1,9 @@
 // handlers/vouch/mod.rs - Vouch routes
 use crate::AppState;
-use axum::{routing::{get, post}, Router};
+use axum::{
+    Router,
+    routing::{get, post},
+};
 use std::sync::Arc;
 
 pub mod default_configs;

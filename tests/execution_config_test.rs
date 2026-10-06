@@ -44,24 +44,36 @@ fn unique_config_name(prefix: &str) -> String {
 
 /// Helper to delete a config
 async fn delete_config(app: &TestApp, name: &str) {
-    let _ = app.client()
-        .delete(&format!("{}/api/admin/vouch/configs/default/{}", app.address, name))
+    let _ = app
+        .client()
+        .delete(format!(
+            "{}/api/admin/vouch/configs/default/{}",
+            app.address, name
+        ))
         .send()
         .await;
 }
 
 /// Helper to delete a proposer pattern
 async fn delete_pattern(app: &TestApp, name: &str) {
-    let _ = app.client()
-        .delete(&format!("{}/api/admin/vouch/proposer-patterns/{}", app.address, name))
+    let _ = app
+        .client()
+        .delete(format!(
+            "{}/api/admin/vouch/proposer-patterns/{}",
+            app.address, name
+        ))
         .send()
         .await;
 }
 
 /// Helper to delete a proposer
 async fn delete_proposer(app: &TestApp, pubkey: &str) {
-    let _ = app.client()
-        .delete(&format!("{}/api/admin/vouch/proposers/{}", app.address, pubkey))
+    let _ = app
+        .client()
+        .delete(format!(
+            "{}/api/admin/vouch/proposers/{}",
+            app.address, pubkey
+        ))
         .send()
         .await;
 }
@@ -77,7 +89,7 @@ async fn test_get_execution_config_basic() {
 
     // Create a default config
     app.client()
-        .post(&format!("{}/api/admin/vouch/configs/default", app.address))
+        .post(format!("{}/api/admin/vouch/configs/default", app.address))
         .json(&json!({
             "name": config_name,
             "fee_recipient": "0x1234567890abcdef1234567890abcdef12345678",
@@ -97,7 +109,10 @@ async fn test_get_execution_config_basic() {
     // Get execution config
     let response = app
         .client()
-        .post(&format!("{}/vouch/v2/execution-config/{}", app.address, config_name))
+        .post(format!(
+            "{}/vouch/v2/execution-config/{}",
+            app.address, config_name
+        ))
         .json(&json!([]))
         .send()
         .await
@@ -107,7 +122,10 @@ async fn test_get_execution_config_basic() {
 
     let body: ExecutionConfigResponse = response.json().await.expect("Failed to parse JSON");
     assert_eq!(body.version, 2);
-    assert_eq!(body.fee_recipient, Some("0x1234567890abcdef1234567890abcdef12345678".to_string()));
+    assert_eq!(
+        body.fee_recipient,
+        Some("0x1234567890abcdef1234567890abcdef12345678".to_string())
+    );
     assert_eq!(body.gas_limit, Some("30000000".to_string()));
     assert!(body.relays.is_some());
 
@@ -121,7 +139,10 @@ async fn test_get_execution_config_not_found() {
 
     let response = app
         .client()
-        .post(&format!("{}/vouch/v2/execution-config/{}", app.address, config_name))
+        .post(format!(
+            "{}/vouch/v2/execution-config/{}",
+            app.address, config_name
+        ))
         .json(&json!([]))
         .send()
         .await
@@ -137,7 +158,7 @@ async fn test_get_execution_config_inactive() {
 
     // Create an inactive default config
     app.client()
-        .post(&format!("{}/api/admin/vouch/configs/default", app.address))
+        .post(format!("{}/api/admin/vouch/configs/default", app.address))
         .json(&json!({
             "name": config_name,
             "fee_recipient": "0x1234567890abcdef1234567890abcdef12345678",
@@ -150,7 +171,10 @@ async fn test_get_execution_config_inactive() {
     // Should return 404 for inactive config
     let response = app
         .client()
-        .post(&format!("{}/vouch/v2/execution-config/{}", app.address, config_name))
+        .post(format!(
+            "{}/vouch/v2/execution-config/{}",
+            app.address, config_name
+        ))
         .json(&json!([]))
         .send()
         .await
@@ -172,8 +196,9 @@ async fn test_get_execution_config_with_proposer_keys() {
     let pubkey = TestApp::test_bls_pubkey(&format!("prop{}", TestApp::unique_id()));
 
     // Create default config
-    let create_resp = app.client()
-        .post(&format!("{}/api/admin/vouch/configs/default", app.address))
+    let create_resp = app
+        .client()
+        .post(format!("{}/api/admin/vouch/configs/default", app.address))
         .json(&json!({
             "name": config_name,
             "fee_recipient": "0xdef1def1def1def1def1def1def1def1def1def1",
@@ -187,8 +212,12 @@ async fn test_get_execution_config_with_proposer_keys() {
     assert_eq!(create_resp.status(), 201, "Config creation failed");
 
     // Create proposer with custom config
-    let proposer_resp = app.client()
-        .put(&format!("{}/api/admin/vouch/proposers/{}", app.address, pubkey))
+    let proposer_resp = app
+        .client()
+        .put(format!(
+            "{}/api/admin/vouch/proposers/{}",
+            app.address, pubkey
+        ))
         .json(&json!({
             "fee_recipient": "0x5e8422345238f34275888049021821e8e08caa1f",
             "gas_limit": "35000000",
@@ -198,12 +227,18 @@ async fn test_get_execution_config_with_proposer_keys() {
         .await
         .expect("Failed to create proposer");
 
-    assert!(proposer_resp.status() == 200 || proposer_resp.status() == 201, "Proposer creation failed");
+    assert!(
+        proposer_resp.status() == 200 || proposer_resp.status() == 201,
+        "Proposer creation failed"
+    );
 
     // Get execution config with proposer key
     let response = app
         .client()
-        .post(&format!("{}/vouch/v2/execution-config/{}", app.address, config_name))
+        .post(format!(
+            "{}/vouch/v2/execution-config/{}",
+            app.address, config_name
+        ))
         .json(&json!([pubkey]))
         .send()
         .await
@@ -214,14 +249,20 @@ async fn test_get_execution_config_with_proposer_keys() {
     let body: ExecutionConfigResponse = response.json().await.expect("Failed to parse JSON");
 
     // Should have default values
-    assert_eq!(body.fee_recipient, Some("0xdef1def1def1def1def1def1def1def1def1def1".to_string()));
+    assert_eq!(
+        body.fee_recipient,
+        Some("0xdef1def1def1def1def1def1def1def1def1def1".to_string())
+    );
 
     // Should have proposer-specific entry
     assert!(body.proposers.is_some());
     let proposers = body.proposers.as_ref().unwrap();
     assert_eq!(proposers.len(), 1);
     assert_eq!(proposers[0].proposer, pubkey);
-    assert_eq!(proposers[0].fee_recipient, Some("0x5e8422345238f34275888049021821e8e08caa1f".to_string()));
+    assert_eq!(
+        proposers[0].fee_recipient,
+        Some("0x5e8422345238f34275888049021821e8e08caa1f".to_string())
+    );
     assert_eq!(proposers[0].gas_limit, Some("35000000".to_string()));
     assert_eq!(proposers[0].reset_relays, Some(true));
 
@@ -237,7 +278,7 @@ async fn test_get_execution_config_unknown_keys() {
 
     // Create default config
     app.client()
-        .post(&format!("{}/api/admin/vouch/configs/default", app.address))
+        .post(format!("{}/api/admin/vouch/configs/default", app.address))
         .json(&json!({
             "name": config_name,
             "fee_recipient": "0xdef1def1def1def1def1def1def1def1def1def1",
@@ -250,7 +291,10 @@ async fn test_get_execution_config_unknown_keys() {
     // Request with keys that don't have specific configs
     let response = app
         .client()
-        .post(&format!("{}/vouch/v2/execution-config/{}", app.address, config_name))
+        .post(format!(
+            "{}/vouch/v2/execution-config/{}",
+            app.address, config_name
+        ))
         .json(&json!([unknown_key]))
         .send()
         .await
@@ -261,14 +305,20 @@ async fn test_get_execution_config_unknown_keys() {
     let body: ExecutionConfigResponse = response.json().await.expect("Failed to parse JSON");
 
     // Should return default config
-    assert_eq!(body.fee_recipient, Some("0xdef1def1def1def1def1def1def1def1def1def1".to_string()));
+    assert_eq!(
+        body.fee_recipient,
+        Some("0xdef1def1def1def1def1def1def1def1def1def1".to_string())
+    );
     // For unknown keys, either proposers is empty/None, or if returned, they shouldn't have specific overrides
     if let Some(proposers) = &body.proposers {
         // If proposers is returned for unknown keys, verify no specific overrides for our key
         let our_proposer = proposers.iter().find(|p| p.proposer == unknown_key);
         if let Some(p) = our_proposer {
             // Unknown key should have no specific fee_recipient override
-            assert!(p.fee_recipient.is_none(), "Unknown key should not have specific fee_recipient");
+            assert!(
+                p.fee_recipient.is_none(),
+                "Unknown key should not have specific fee_recipient"
+            );
         }
     }
 
@@ -288,7 +338,7 @@ async fn test_get_execution_config_with_tags() {
 
     // Create default config
     app.client()
-        .post(&format!("{}/api/admin/vouch/configs/default", app.address))
+        .post(format!("{}/api/admin/vouch/configs/default", app.address))
         .json(&json!({
             "name": config_name,
             "fee_recipient": "0xdef1def1def1def1def1def1def1def1def1def1",
@@ -300,7 +350,7 @@ async fn test_get_execution_config_with_tags() {
 
     // Create proposer pattern with tags
     app.client()
-        .post(&format!("{}/api/admin/vouch/proposer-patterns", app.address))
+        .post(format!("{}/api/admin/vouch/proposer-patterns", app.address))
         .json(&json!({
             "name": pattern_name,
             "pattern": "^0xtest.*$",
@@ -315,7 +365,10 @@ async fn test_get_execution_config_with_tags() {
     // Get execution config with tags filter
     let response = app
         .client()
-        .post(&format!("{}/vouch/v2/execution-config/{}?tags=lido", app.address, config_name))
+        .post(format!(
+            "{}/vouch/v2/execution-config/{}?tags=lido",
+            app.address, config_name
+        ))
         .json(&json!([]))
         .send()
         .await
@@ -331,7 +384,10 @@ async fn test_get_execution_config_with_tags() {
     // Should have the pattern entry
     let pattern_entry = proposers.iter().find(|p| p.proposer == "^0xtest.*$");
     assert!(pattern_entry.is_some());
-    assert_eq!(pattern_entry.unwrap().fee_recipient, Some("0x11d011d011d011d011d011d011d011d011d011d0".to_string()));
+    assert_eq!(
+        pattern_entry.unwrap().fee_recipient,
+        Some("0x11d011d011d011d011d011d011d011d011d011d0".to_string())
+    );
 
     delete_pattern(app, &pattern_name).await;
     delete_config(app, &config_name).await;
@@ -352,7 +408,7 @@ async fn test_execution_config_patterns_after_proposers_in_tag_order() {
 
     // Create default config
     app.client()
-        .post(&format!("{}/api/admin/vouch/configs/default", app.address))
+        .post(format!("{}/api/admin/vouch/configs/default", app.address))
         .json(&json!({
             "name": config_name,
             "fee_recipient": "0xdef1def1def1def1def1def1def1def1def1def1",
@@ -364,7 +420,10 @@ async fn test_execution_config_patterns_after_proposers_in_tag_order() {
 
     // Create proposer
     app.client()
-        .put(&format!("{}/api/admin/vouch/proposers/{}", app.address, pubkey))
+        .put(format!(
+            "{}/api/admin/vouch/proposers/{}",
+            app.address, pubkey
+        ))
         .json(&json!({
             "fee_recipient": "0x1111111111111111111111111111111111111111"
         }))
@@ -374,7 +433,7 @@ async fn test_execution_config_patterns_after_proposers_in_tag_order() {
 
     // Create pattern with "dev" tag
     app.client()
-        .post(&format!("{}/api/admin/vouch/proposer-patterns", app.address))
+        .post(format!("{}/api/admin/vouch/proposer-patterns", app.address))
         .json(&json!({
             "name": pattern_dev,
             "pattern": "^dev/.*$",
@@ -387,7 +446,7 @@ async fn test_execution_config_patterns_after_proposers_in_tag_order() {
 
     // Create pattern with "lido" tag
     app.client()
-        .post(&format!("{}/api/admin/vouch/proposer-patterns", app.address))
+        .post(format!("{}/api/admin/vouch/proposer-patterns", app.address))
         .json(&json!({
             "name": pattern_lido,
             "pattern": "^lido/.*$",
@@ -401,7 +460,10 @@ async fn test_execution_config_patterns_after_proposers_in_tag_order() {
     // Request with tags=lido,dev - lido should come before dev
     let response = app
         .client()
-        .post(&format!("{}/vouch/v2/execution-config/{}?tags=lido,dev", app.address, config_name))
+        .post(format!(
+            "{}/vouch/v2/execution-config/{}?tags=lido,dev",
+            app.address, config_name
+        ))
         .json(&json!([pubkey]))
         .send()
         .await
@@ -423,8 +485,14 @@ async fn test_execution_config_patterns_after_proposers_in_tag_order() {
     assert!(dev_pos.is_some(), "Dev pattern should be present");
 
     // Both patterns should come after the proposer
-    assert!(lido_pos.unwrap() > 0, "Lido pattern should come after proposer");
-    assert!(dev_pos.unwrap() > 0, "Dev pattern should come after proposer");
+    assert!(
+        lido_pos.unwrap() > 0,
+        "Lido pattern should come after proposer"
+    );
+    assert!(
+        dev_pos.unwrap() > 0,
+        "Dev pattern should come after proposer"
+    );
 
     // Lido should come before dev (matches tag order: lido,dev)
     assert!(
@@ -453,7 +521,7 @@ async fn test_get_execution_config_multiple_proposers() {
 
     // Create default config
     app.client()
-        .post(&format!("{}/api/admin/vouch/configs/default", app.address))
+        .post(format!("{}/api/admin/vouch/configs/default", app.address))
         .json(&json!({
             "name": config_name,
             "fee_recipient": "0xdef1def1def1def1def1def1def1def1def1def1",
@@ -470,7 +538,10 @@ async fn test_get_execution_config_multiple_proposers() {
 
     for (i, pubkey) in [&pubkey1, &pubkey2, &pubkey3].iter().enumerate() {
         app.client()
-            .put(&format!("{}/api/admin/vouch/proposers/{}", app.address, pubkey))
+            .put(format!(
+                "{}/api/admin/vouch/proposers/{}",
+                app.address, pubkey
+            ))
             .json(&json!({
                 "gas_limit": format!("{}0000000", 30 + i)
             }))
@@ -482,7 +553,10 @@ async fn test_get_execution_config_multiple_proposers() {
     // Get execution config with all three keys
     let response = app
         .client()
-        .post(&format!("{}/vouch/v2/execution-config/{}", app.address, config_name))
+        .post(format!(
+            "{}/vouch/v2/execution-config/{}",
+            app.address, config_name
+        ))
         .json(&json!([pubkey1.clone(), pubkey2.clone(), pubkey3.clone()]))
         .send()
         .await

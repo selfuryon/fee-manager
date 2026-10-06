@@ -1,4 +1,5 @@
 // handlers/vouch/default_configs.rs - Default Config CRUD handlers
+use crate::AppState;
 use crate::audit::{AuditAction, AuditChanges, RequestContext, ResourceType};
 use crate::audit_log;
 use crate::errors::ApiError;
@@ -6,14 +7,14 @@ use crate::schema::{
     CreateDefaultConfigRequest, DefaultConfigListItem, DefaultConfigResponse, PaginatedResponse,
     RelayConfig, UpdateDefaultConfigRequest,
 };
-use crate::AppState;
 use axum::{
+    Json,
     extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
-    Json,
 };
 use serde::Deserialize;
+use sqlx::{Postgres, QueryBuilder};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{info, instrument};
@@ -40,6 +41,37 @@ fn default_limit() -> i64 {
     100
 }
 
+/// Appends the WHERE clause for `filters`; every value is a bind parameter.
+fn push_filters(qb: &mut QueryBuilder<Postgres>, filters: &DefaultConfigFilters) {
+    qb.push(" WHERE TRUE");
+    if let Some(ref name) = filters.name {
+        qb.push(" AND c.name LIKE ").push_bind(format!("{name}%"));
+    }
+    if let Some(ref fr) = filters.fee_recipient {
+        qb.push(" AND c.fee_recipient = ").push_bind(fr.clone());
+    }
+    if let Some(ref gl) = filters.gas_limit {
+        qb.push(" AND c.gas_limit = ").push_bind(gl.clone());
+    }
+    if let Some(ref mv) = filters.min_value {
+        qb.push(" AND c.min_value = ").push_bind(mv.clone());
+    }
+    if let Some(active) = filters.active {
+        qb.push(" AND c.active = ").push_bind(active);
+    }
+    // Relay filters using EXISTS subquery
+    if let Some(ref relay_url) = filters.relay_url {
+        qb.push(" AND EXISTS (SELECT 1 FROM vouch_default_relays r WHERE r.config_name = c.name AND r.url LIKE ")
+            .push_bind(format!("{relay_url}%"))
+            .push(")");
+    }
+    if let Some(ref relay_min_value) = filters.relay_min_value {
+        qb.push(" AND EXISTS (SELECT 1 FROM vouch_default_relays r WHERE r.config_name = c.name AND r.min_value = ")
+            .push_bind(relay_min_value.clone())
+            .push(")");
+    }
+}
+
 #[utoipa::path(
     get,
     path = "/api/admin/vouch/configs/default",
@@ -57,79 +89,39 @@ pub async fn list_default_configs(
 ) -> Result<Json<PaginatedResponse<DefaultConfigListItem>>, ApiError> {
     info!("Listing default configs with filters: {:?}", filters);
 
-    let mut conditions = Vec::new();
-
-    if let Some(ref name) = filters.name {
-        conditions.push(format!("c.name LIKE '{}%'", name.replace('\'', "''")));
-    }
-    if let Some(ref fr) = filters.fee_recipient {
-        conditions.push(format!("c.fee_recipient = '{}'", fr.replace('\'', "''")));
-    }
-    if let Some(ref gl) = filters.gas_limit {
-        conditions.push(format!("c.gas_limit = '{}'", gl.replace('\'', "''")));
-    }
-    if let Some(ref mv) = filters.min_value {
-        conditions.push(format!("c.min_value = '{}'", mv.replace('\'', "''")));
-    }
-    if let Some(active) = filters.active {
-        conditions.push(format!("c.active = {}", if active { "true" } else { "false" }));
-    }
-    // Relay filters using EXISTS subquery
-    if let Some(ref relay_url) = filters.relay_url {
-        conditions.push(format!(
-            "EXISTS (SELECT 1 FROM vouch_default_relays r WHERE r.config_name = c.name AND r.url LIKE '{}%')",
-            relay_url.replace('\'', "''")
-        ));
-    }
-    if let Some(ref relay_min_value) = filters.relay_min_value {
-        conditions.push(format!(
-            "EXISTS (SELECT 1 FROM vouch_default_relays r WHERE r.config_name = c.name AND r.min_value = '{}')",
-            relay_min_value.replace('\'', "''")
-        ));
-    }
-
-    let where_clause = if conditions.is_empty() {
-        String::new()
-    } else {
-        format!("WHERE {}", conditions.join(" AND "))
-    };
-
-    let count_sql = format!(
-        "SELECT COUNT(*) as count FROM vouch_default_configs c {}",
-        where_clause
-    );
-    let total: i64 = sqlx::query_scalar(&count_sql)
+    let mut count_query = QueryBuilder::new("SELECT COUNT(*) FROM vouch_default_configs c");
+    push_filters(&mut count_query, &filters);
+    let total: i64 = count_query
+        .build_query_scalar()
         .fetch_one(&state.pool)
         .await?;
 
-    let data_sql = format!(
+    let mut data_query = QueryBuilder::new(
         "SELECT c.name, c.fee_recipient, c.gas_limit, c.min_value, c.active, c.created_at, c.updated_at
-         FROM vouch_default_configs c {}
-         ORDER BY c.name ASC
-         LIMIT {} OFFSET {}",
-        where_clause, filters.limit, filters.offset
+         FROM vouch_default_configs c",
     );
+    push_filters(&mut data_query, &filters);
+    data_query
+        .push(" ORDER BY c.name ASC LIMIT ")
+        .push_bind(filters.limit)
+        .push(" OFFSET ")
+        .push_bind(filters.offset);
 
-    let configs = sqlx::query_as::<_, crate::models::VouchDefaultConfig>(&data_sql)
+    let configs = data_query
+        .build_query_as::<crate::models::VouchDefaultConfig>()
         .fetch_all(&state.pool)
         .await?;
 
     // Fetch relays for all configs in the result
     let config_names: Vec<&str> = configs.iter().map(|c| c.name.as_str()).collect();
     let relays_map = if !config_names.is_empty() {
-        let placeholders: Vec<String> = config_names.iter().enumerate()
-            .map(|(i, _)| format!("${}", i + 1))
-            .collect();
-        let relays_sql = format!(
+        let all_relays = sqlx::query_as::<_, crate::models::VouchDefaultRelay>(
             "SELECT id, config_name, url, public_key, fee_recipient, gas_limit, min_value
-             FROM vouch_default_relays WHERE config_name IN ({})",
-            placeholders.join(", ")
-        );
-        let mut query = sqlx::query_as::<_, crate::models::VouchDefaultRelay>(&relays_sql);
-        for name in &config_names {
-            query = query.bind(*name);
-        }
-        let all_relays = query.fetch_all(&state.pool).await?;
+             FROM vouch_default_relays WHERE config_name = ANY($1)",
+        )
+        .bind(&config_names)
+        .fetch_all(&state.pool)
+        .await?;
 
         // Group relays by config_name
         let mut map: HashMap<String, HashMap<String, RelayConfig>> = HashMap::new();
@@ -241,12 +233,11 @@ pub async fn create_default_config(
     let mut tx = state.pool.begin().await?;
 
     // Check if config already exists
-    let existing = sqlx::query_scalar::<_, i64>(
-        "SELECT COUNT(*) FROM vouch_default_configs WHERE name = $1",
-    )
-    .bind(&req.name)
-    .fetch_one(&mut *tx)
-    .await?;
+    let existing =
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM vouch_default_configs WHERE name = $1")
+            .bind(&req.name)
+            .fetch_one(&mut *tx)
+            .await?;
 
     if existing > 0 {
         return Err(ApiError::InvalidData(format!(
@@ -297,7 +288,13 @@ pub async fn create_default_config(
             relays_count: req.relays.as_ref().map(|r| r.len()),
             ..Default::default()
         };
-        audit_log!(ctx, AuditAction::Create, ResourceType::VouchDefaultConfig, &req.name, changes);
+        audit_log!(
+            ctx,
+            AuditAction::Create,
+            ResourceType::VouchDefaultConfig,
+            &req.name,
+            changes
+        );
     }
 
     // Fetch the created config
@@ -366,12 +363,11 @@ pub async fn update_default_config(
     let mut tx = state.pool.begin().await?;
 
     // Check if config exists
-    let existing = sqlx::query_scalar::<_, i64>(
-        "SELECT COUNT(*) FROM vouch_default_configs WHERE name = $1",
-    )
-    .bind(&name)
-    .fetch_one(&mut *tx)
-    .await?;
+    let existing =
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM vouch_default_configs WHERE name = $1")
+            .bind(&name)
+            .fetch_one(&mut *tx)
+            .await?;
 
     if existing == 0 {
         return Err(ApiError::NotFound(format!(
@@ -380,31 +376,26 @@ pub async fn update_default_config(
         )));
     }
 
-    // Build update query dynamically
-    let mut updates = Vec::new();
-    if req.fee_recipient.is_some() {
-        updates.push("fee_recipient = $2");
-    }
-    if req.gas_limit.is_some() {
-        updates.push("gas_limit = $3");
-    }
-    if req.min_value.is_some() {
-        updates.push("min_value = $4");
-    }
-    if req.active.is_some() {
-        updates.push("active = $5");
-    }
+    // Omitted fields keep their current value
+    let has_updates = req.fee_recipient.is_some()
+        || req.gas_limit.is_some()
+        || req.min_value.is_some()
+        || req.active.is_some();
 
-    if !updates.is_empty() {
-        sqlx::query(&format!(
-            "UPDATE vouch_default_configs SET {} WHERE name = $1",
-            updates.join(", ")
-        ))
+    if has_updates {
+        sqlx::query(
+            "UPDATE vouch_default_configs SET
+                fee_recipient = COALESCE($2, fee_recipient),
+                gas_limit = COALESCE($3, gas_limit),
+                min_value = COALESCE($4, min_value),
+                active = COALESCE($5, active)
+             WHERE name = $1",
+        )
         .bind(&name)
         .bind(&req.fee_recipient)
         .bind(&req.gas_limit)
         .bind(&req.min_value)
-        .bind(&req.active)
+        .bind(req.active)
         .execute(&mut *tx)
         .await?;
     }
@@ -445,7 +436,13 @@ pub async fn update_default_config(
             relays_count: req.relays.as_ref().map(|r| r.len()),
             ..Default::default()
         };
-        audit_log!(ctx, AuditAction::Update, ResourceType::VouchDefaultConfig, &name, changes);
+        audit_log!(
+            ctx,
+            AuditAction::Update,
+            ResourceType::VouchDefaultConfig,
+            &name,
+            changes
+        );
     }
 
     // Fetch updated config
@@ -521,7 +518,12 @@ pub async fn delete_default_config(
 
     // Audit log
     if state.config.audit_enabled {
-        audit_log!(ctx, AuditAction::Delete, ResourceType::VouchDefaultConfig, &name);
+        audit_log!(
+            ctx,
+            AuditAction::Delete,
+            ResourceType::VouchDefaultConfig,
+            &name
+        );
     }
 
     Ok(StatusCode::NO_CONTENT)

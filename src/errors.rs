@@ -1,9 +1,9 @@
 // errors.rs
 use axum::{
+    Json,
     body::Body,
     http::{Response, StatusCode},
     response::IntoResponse,
-    Json,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -20,7 +20,6 @@ pub struct ErrorDetail {
     pub code: String,
     pub message: String,
 }
-
 
 #[derive(Debug, Error)]
 pub enum ApiError {

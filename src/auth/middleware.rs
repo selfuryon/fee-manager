@@ -5,13 +5,13 @@ use std::sync::Arc;
 use axum::{
     body::Body,
     extract::State,
-    http::{header::AUTHORIZATION, Request},
+    http::{Request, header::AUTHORIZATION},
     middleware::Next,
     response::Response,
 };
 
 use super::service::{get_token_by_hash, update_last_used};
-use crate::{audit::ActorInfo, errors::ApiError, AppState};
+use crate::{AppState, audit::ActorInfo, errors::ApiError};
 
 /// Middleware that requires authentication via Bearer token
 pub async fn require_auth(

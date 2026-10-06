@@ -7,7 +7,7 @@ pub use context::RequestContext;
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use std::fs::OpenOptions;
-use std::io::{stderr, stdout, Write};
+use std::io::{Write, stderr, stdout};
 use std::sync::{Mutex, OnceLock};
 use uuid::Uuid;
 

@@ -1,4 +1,5 @@
 // handlers/vouch/proposers.rs - Proposer CRUD handlers
+use crate::AppState;
 use crate::audit::{AuditAction, AuditChanges, RequestContext, ResourceType};
 use crate::audit_log;
 use crate::errors::ApiError;
@@ -6,14 +7,14 @@ use crate::schema::{
     CreateOrUpdateProposerRequest, PaginatedResponse, ProposerListItem, ProposerRelayConfig,
     ProposerResponse,
 };
-use crate::AppState;
 use axum::{
+    Json,
     extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
-    Json,
 };
 use serde::Deserialize;
+use sqlx::{Postgres, QueryBuilder};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{info, instrument};
@@ -42,6 +43,43 @@ fn default_limit() -> i64 {
     100
 }
 
+/// Appends the WHERE clause for `filters`; every value is a bind parameter.
+fn push_filters(qb: &mut QueryBuilder<Postgres>, filters: &ProposerFilters) {
+    qb.push(" WHERE TRUE");
+    if let Some(ref pk) = filters.public_key {
+        qb.push(" AND p.public_key LIKE ")
+            .push_bind(format!("{pk}%"));
+    }
+    if let Some(ref fr) = filters.fee_recipient {
+        qb.push(" AND p.fee_recipient = ").push_bind(fr.clone());
+    }
+    if let Some(ref gl) = filters.gas_limit {
+        qb.push(" AND p.gas_limit = ").push_bind(gl.clone());
+    }
+    if let Some(ref mv) = filters.min_value {
+        qb.push(" AND p.min_value = ").push_bind(mv.clone());
+    }
+    if let Some(rr) = filters.reset_relays {
+        qb.push(" AND p.reset_relays = ").push_bind(rr);
+    }
+    // Relay filters using EXISTS subquery
+    if let Some(ref relay_url) = filters.relay_url {
+        qb.push(" AND EXISTS (SELECT 1 FROM vouch_proposer_relays r WHERE r.proposer_public_key = p.public_key AND r.url LIKE ")
+            .push_bind(format!("{relay_url}%"))
+            .push(")");
+    }
+    if let Some(ref relay_min_value) = filters.relay_min_value {
+        qb.push(" AND EXISTS (SELECT 1 FROM vouch_proposer_relays r WHERE r.proposer_public_key = p.public_key AND r.min_value = ")
+            .push_bind(relay_min_value.clone())
+            .push(")");
+    }
+    if let Some(relay_disabled) = filters.relay_disabled {
+        qb.push(" AND EXISTS (SELECT 1 FROM vouch_proposer_relays r WHERE r.proposer_public_key = p.public_key AND r.disabled = ")
+            .push_bind(relay_disabled)
+            .push(")");
+    }
+}
+
 #[utoipa::path(
     get,
     path = "/api/admin/vouch/proposers",
@@ -59,88 +97,39 @@ pub async fn list_proposers(
 ) -> Result<Json<PaginatedResponse<ProposerListItem>>, ApiError> {
     info!("Listing proposers with filters: {:?}", filters);
 
-    // Build dynamic query based on filters
-    let mut conditions = Vec::new();
-
-    if let Some(ref pk) = filters.public_key {
-        conditions.push(format!("p.public_key LIKE '{}%'", pk.replace('\'', "''")));
-    }
-    if let Some(ref fr) = filters.fee_recipient {
-        conditions.push(format!("p.fee_recipient = '{}'", fr.replace('\'', "''")));
-    }
-    if let Some(ref gl) = filters.gas_limit {
-        conditions.push(format!("p.gas_limit = '{}'", gl.replace('\'', "''")));
-    }
-    if let Some(ref mv) = filters.min_value {
-        conditions.push(format!("p.min_value = '{}'", mv.replace('\'', "''")));
-    }
-    if let Some(rr) = filters.reset_relays {
-        conditions.push(format!(
-            "p.reset_relays = {}",
-            if rr { "true" } else { "false" }
-        ));
-    }
-    // Relay filters using EXISTS subquery
-    if let Some(ref relay_url) = filters.relay_url {
-        conditions.push(format!(
-            "EXISTS (SELECT 1 FROM vouch_proposer_relays r WHERE r.proposer_public_key = p.public_key AND r.url LIKE '{}%')",
-            relay_url.replace('\'', "''")
-        ));
-    }
-    if let Some(ref relay_min_value) = filters.relay_min_value {
-        conditions.push(format!(
-            "EXISTS (SELECT 1 FROM vouch_proposer_relays r WHERE r.proposer_public_key = p.public_key AND r.min_value = '{}')",
-            relay_min_value.replace('\'', "''")
-        ));
-    }
-    if let Some(relay_disabled) = filters.relay_disabled {
-        conditions.push(format!(
-            "EXISTS (SELECT 1 FROM vouch_proposer_relays r WHERE r.proposer_public_key = p.public_key AND r.disabled = {})",
-            if relay_disabled { "true" } else { "false" }
-        ));
-    }
-
-    let where_clause = if conditions.is_empty() {
-        String::new()
-    } else {
-        format!("WHERE {}", conditions.join(" AND "))
-    };
-
-    // Count query
-    let count_sql = format!("SELECT COUNT(*) as count FROM vouch_proposers p {}", where_clause);
-    let total: i64 = sqlx::query_scalar(&count_sql)
+    let mut count_query = QueryBuilder::new("SELECT COUNT(*) FROM vouch_proposers p");
+    push_filters(&mut count_query, &filters);
+    let total: i64 = count_query
+        .build_query_scalar()
         .fetch_one(&state.pool)
         .await?;
 
-    // Data query
-    let data_sql = format!(
+    let mut data_query = QueryBuilder::new(
         "SELECT p.public_key, p.fee_recipient, p.gas_limit, p.min_value, p.reset_relays, p.created_at, p.updated_at
-         FROM vouch_proposers p {}
-         ORDER BY p.created_at DESC
-         LIMIT {} OFFSET {}",
-        where_clause, filters.limit, filters.offset
+         FROM vouch_proposers p",
     );
+    push_filters(&mut data_query, &filters);
+    data_query
+        .push(" ORDER BY p.created_at DESC LIMIT ")
+        .push_bind(filters.limit)
+        .push(" OFFSET ")
+        .push_bind(filters.offset);
 
-    let proposers = sqlx::query_as::<_, crate::models::VouchProposer>(&data_sql)
+    let proposers = data_query
+        .build_query_as::<crate::models::VouchProposer>()
         .fetch_all(&state.pool)
         .await?;
 
     // Fetch relays for all proposers in the result
     let pubkeys: Vec<String> = proposers.iter().map(|p| p.public_key.to_string()).collect();
     let relays_map = if !pubkeys.is_empty() {
-        let placeholders: Vec<String> = pubkeys.iter().enumerate()
-            .map(|(i, _)| format!("${}", i + 1))
-            .collect();
-        let relays_sql = format!(
+        let all_relays = sqlx::query_as::<_, crate::models::VouchProposerRelay>(
             "SELECT id, proposer_public_key, url, public_key, fee_recipient, gas_limit, min_value, disabled
-             FROM vouch_proposer_relays WHERE proposer_public_key IN ({})",
-            placeholders.join(", ")
-        );
-        let mut query = sqlx::query_as::<_, crate::models::VouchProposerRelay>(&relays_sql);
-        for pk in &pubkeys {
-            query = query.bind(pk);
-        }
-        let all_relays = query.fetch_all(&state.pool).await?;
+             FROM vouch_proposer_relays WHERE proposer_public_key = ANY($1)",
+        )
+        .bind(&pubkeys)
+        .fetch_all(&state.pool)
+        .await?;
 
         // Group relays by proposer_public_key
         let mut map: HashMap<String, HashMap<String, ProposerRelayConfig>> = HashMap::new();
@@ -256,12 +245,11 @@ pub async fn create_or_update_proposer(
     let mut tx = state.pool.begin().await?;
 
     // Check if proposer exists
-    let existing = sqlx::query_scalar::<_, i64>(
-        "SELECT COUNT(*) FROM vouch_proposers WHERE public_key = $1",
-    )
-    .bind(&public_key)
-    .fetch_one(&mut *tx)
-    .await?;
+    let existing =
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM vouch_proposers WHERE public_key = $1")
+            .bind(&public_key)
+            .fetch_one(&mut *tx)
+            .await?;
 
     let is_new = existing == 0;
 
@@ -329,8 +317,18 @@ pub async fn create_or_update_proposer(
             relays_count: req.relays.as_ref().map(|r| r.len()),
             ..Default::default()
         };
-        let action = if is_new { AuditAction::Create } else { AuditAction::Update };
-        audit_log!(ctx, action, ResourceType::VouchProposer, &public_key, changes);
+        let action = if is_new {
+            AuditAction::Create
+        } else {
+            AuditAction::Update
+        };
+        audit_log!(
+            ctx,
+            action,
+            ResourceType::VouchProposer,
+            &public_key,
+            changes
+        );
     }
 
     // Fetch the result
@@ -412,7 +410,12 @@ pub async fn delete_proposer(
 
     // Audit log
     if state.config.audit_enabled {
-        audit_log!(ctx, AuditAction::Delete, ResourceType::VouchProposer, &public_key);
+        audit_log!(
+            ctx,
+            AuditAction::Delete,
+            ResourceType::VouchProposer,
+            &public_key
+        );
     }
 
     Ok(StatusCode::NO_CONTENT)

@@ -1,12 +1,12 @@
 // tests/common/mod.rs - Test utilities and helpers
 #![allow(dead_code)]
 
-use fee_manager::{config, create_router, run_migrations, AppState};
+use fee_manager::{AppState, config, create_router, run_migrations};
 use reqwest::{Client, header};
 use sqlx::PgPool;
-use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::sync::OnceLock;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 static TEST_APP: OnceLock<TestApp> = OnceLock::new();
 static TEST_COUNTER: AtomicU32 = AtomicU32::new(0);
@@ -40,7 +40,12 @@ impl TestApp {
                 let temp_client = Client::new();
                 // Wait for server to be ready
                 for _ in 0..50 {
-                    if temp_client.get(&format!("{}/health", address)).send().await.is_ok() {
+                    if temp_client
+                        .get(format!("{}/health", address))
+                        .send()
+                        .await
+                        .is_ok()
+                    {
                         break;
                     }
                     tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
@@ -59,11 +64,19 @@ impl TestApp {
             .expect("Failed to connect to database for tests");
 
         // Create a test auth token
-        let (_, auth_token) = fee_manager::auth::service::create_token(&pool, "test-token", Some("Token for integration tests"))
-            .await
-            .expect("Failed to create test auth token");
+        let (_, auth_token) = fee_manager::auth::service::create_token(
+            &pool,
+            "test-token",
+            Some("Token for integration tests"),
+        )
+        .await
+        .expect("Failed to create test auth token");
 
-        TEST_APP.get_or_init(|| TestApp { address, pool, auth_token })
+        TEST_APP.get_or_init(|| TestApp {
+            address,
+            pool,
+            auth_token,
+        })
     }
 
     /// Create a new HTTP client with authentication for this test
@@ -106,10 +119,7 @@ impl TestApp {
             .expect("Failed to run migrations");
 
         // Create app state
-        let state = Arc::new(AppState {
-            pool,
-            config,
-        });
+        let state = Arc::new(AppState { pool, config });
 
         // Create router
         let app = create_router(state);
@@ -184,7 +194,8 @@ impl TestApp {
     pub fn test_bls_pubkey(suffix: &str) -> String {
         // Convert suffix to hex if it's not already, then pad to 92 chars (96 - 4 for "dead" prefix)
         // Use left-align (:0<92) so suffix comes first, enabling prefix filtering
-        let hex_suffix = suffix.chars()
+        let hex_suffix = suffix
+            .chars()
             .filter(|c| c.is_ascii_hexdigit())
             .collect::<String>();
         format!("0xdead{:0<92}", hex_suffix)
@@ -193,7 +204,8 @@ impl TestApp {
     /// Generate a test ETH address (20 bytes = 40 hex chars after 0x)
     /// Uses "dead" prefix as marker for test addresses
     pub fn test_eth_address(suffix: &str) -> String {
-        let hex_suffix = suffix.chars()
+        let hex_suffix = suffix
+            .chars()
             .filter(|c| c.is_ascii_hexdigit())
             .collect::<String>();
         format!("0xdead{:0>36}", hex_suffix)

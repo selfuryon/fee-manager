@@ -47,8 +47,12 @@ fn unique_mux_name(prefix: &str) -> String {
 
 /// Helper to delete a mux config
 async fn delete_mux(app: &TestApp, name: &str) {
-    let _ = app.client()
-        .delete(&format!("{}/api/admin/commit-boost/mux/{}", app.address, name))
+    let _ = app
+        .client()
+        .delete(format!(
+            "{}/api/admin/commit-boost/mux/{}",
+            app.address, name
+        ))
         .send()
         .await;
 }
@@ -64,7 +68,7 @@ async fn test_create_mux_config() {
 
     let response = app
         .client()
-        .post(&format!("{}/api/admin/commit-boost/mux", app.address))
+        .post(format!("{}/api/admin/commit-boost/mux", app.address))
         .json(&json!({
             "name": name,
             "keys": []
@@ -92,7 +96,7 @@ async fn test_create_mux_config_with_keys() {
 
     let response = app
         .client()
-        .post(&format!("{}/api/admin/commit-boost/mux", app.address))
+        .post(format!("{}/api/admin/commit-boost/mux", app.address))
         .json(&json!({
             "name": name,
             "keys": [key1, key2]
@@ -117,7 +121,7 @@ async fn test_create_mux_config_duplicate() {
 
     // Create first config
     app.client()
-        .post(&format!("{}/api/admin/commit-boost/mux", app.address))
+        .post(format!("{}/api/admin/commit-boost/mux", app.address))
         .json(&json!({
             "name": name
         }))
@@ -128,7 +132,7 @@ async fn test_create_mux_config_duplicate() {
     // Try to create duplicate
     let response = app
         .client()
-        .post(&format!("{}/api/admin/commit-boost/mux", app.address))
+        .post(format!("{}/api/admin/commit-boost/mux", app.address))
         .json(&json!({
             "name": name
         }))
@@ -151,7 +155,7 @@ async fn test_get_mux_config() {
 
     // Create config with keys
     app.client()
-        .post(&format!("{}/api/admin/commit-boost/mux", app.address))
+        .post(format!("{}/api/admin/commit-boost/mux", app.address))
         .json(&json!({
             "name": name,
             "keys": [key1, key2]
@@ -163,7 +167,10 @@ async fn test_get_mux_config() {
     // Get config
     let response = app
         .client()
-        .get(&format!("{}/api/admin/commit-boost/mux/{}", app.address, name))
+        .get(format!(
+            "{}/api/admin/commit-boost/mux/{}",
+            app.address, name
+        ))
         .send()
         .await
         .expect("Failed to send request");
@@ -184,7 +191,10 @@ async fn test_get_mux_config_not_found() {
 
     let response = app
         .client()
-        .get(&format!("{}/api/admin/commit-boost/mux/{}", app.address, name))
+        .get(format!(
+            "{}/api/admin/commit-boost/mux/{}",
+            app.address, name
+        ))
         .send()
         .await
         .expect("Failed to send request");
@@ -203,7 +213,7 @@ async fn test_update_mux_config() {
 
     // Create config
     app.client()
-        .post(&format!("{}/api/admin/commit-boost/mux", app.address))
+        .post(format!("{}/api/admin/commit-boost/mux", app.address))
         .json(&json!({
             "name": name,
             "keys": [key1.clone()]
@@ -215,7 +225,10 @@ async fn test_update_mux_config() {
     // Update config (replace keys)
     let response = app
         .client()
-        .put(&format!("{}/api/admin/commit-boost/mux/{}", app.address, name))
+        .put(format!(
+            "{}/api/admin/commit-boost/mux/{}",
+            app.address, name
+        ))
         .json(&json!({
             "keys": [key2.clone(), key3.clone()]
         }))
@@ -241,7 +254,7 @@ async fn test_delete_mux_config() {
 
     // Create config
     app.client()
-        .post(&format!("{}/api/admin/commit-boost/mux", app.address))
+        .post(format!("{}/api/admin/commit-boost/mux", app.address))
         .json(&json!({
             "name": name
         }))
@@ -252,7 +265,10 @@ async fn test_delete_mux_config() {
     // Delete config
     let response = app
         .client()
-        .delete(&format!("{}/api/admin/commit-boost/mux/{}", app.address, name))
+        .delete(format!(
+            "{}/api/admin/commit-boost/mux/{}",
+            app.address, name
+        ))
         .send()
         .await
         .expect("Failed to send request");
@@ -262,7 +278,10 @@ async fn test_delete_mux_config() {
     // Verify deleted
     let response = app
         .client()
-        .get(&format!("{}/api/admin/commit-boost/mux/{}", app.address, name))
+        .get(format!(
+            "{}/api/admin/commit-boost/mux/{}",
+            app.address, name
+        ))
         .send()
         .await
         .expect("Failed to send request");
@@ -282,7 +301,7 @@ async fn test_add_mux_keys() {
 
     // Create config
     app.client()
-        .post(&format!("{}/api/admin/commit-boost/mux", app.address))
+        .post(format!("{}/api/admin/commit-boost/mux", app.address))
         .json(&json!({
             "name": name
         }))
@@ -296,7 +315,10 @@ async fn test_add_mux_keys() {
 
     let response = app
         .client()
-        .post(&format!("{}/api/admin/commit-boost/mux/{}/keys", app.address, name))
+        .post(format!(
+            "{}/api/admin/commit-boost/mux/{}/keys",
+            app.address, name
+        ))
         .json(&json!({
             "keys": [key1.clone(), key2]
         }))
@@ -315,7 +337,10 @@ async fn test_add_mux_keys() {
 
     let response = app
         .client()
-        .post(&format!("{}/api/admin/commit-boost/mux/{}/keys", app.address, name))
+        .post(format!(
+            "{}/api/admin/commit-boost/mux/{}/keys",
+            app.address, name
+        ))
         .json(&json!({
             "keys": [key1, key3]  // key1 is duplicate
         }))
@@ -343,7 +368,7 @@ async fn test_remove_mux_keys() {
 
     // Create config with keys
     app.client()
-        .post(&format!("{}/api/admin/commit-boost/mux", app.address))
+        .post(format!("{}/api/admin/commit-boost/mux", app.address))
         .json(&json!({
             "name": name,
             "keys": [key1.clone(), key2.clone(), key3.clone()]
@@ -355,7 +380,10 @@ async fn test_remove_mux_keys() {
     // Remove some keys
     let response = app
         .client()
-        .delete(&format!("{}/api/admin/commit-boost/mux/{}/keys", app.address, name))
+        .delete(format!(
+            "{}/api/admin/commit-boost/mux/{}/keys",
+            app.address, name
+        ))
         .json(&json!({
             "keys": [key1, key2]
         }))
@@ -372,7 +400,10 @@ async fn test_remove_mux_keys() {
     // Verify remaining key
     let response = app
         .client()
-        .get(&format!("{}/api/admin/commit-boost/mux/{}", app.address, name))
+        .get(format!(
+            "{}/api/admin/commit-boost/mux/{}",
+            app.address, name
+        ))
         .send()
         .await
         .expect("Failed to send request");
@@ -399,7 +430,7 @@ async fn test_get_mux_keys_public() {
 
     // Create config with keys
     app.client()
-        .post(&format!("{}/api/admin/commit-boost/mux", app.address))
+        .post(format!("{}/api/admin/commit-boost/mux", app.address))
         .json(&json!({
             "name": name,
             "keys": [key1.clone(), key2.clone()]
@@ -411,7 +442,7 @@ async fn test_get_mux_keys_public() {
     // Get keys via public endpoint
     let response = app
         .client()
-        .get(&format!("{}/commit-boost/v1/mux/{}", app.address, name))
+        .get(format!("{}/commit-boost/v1/mux/{}", app.address, name))
         .send()
         .await
         .expect("Failed to send request");
@@ -433,7 +464,7 @@ async fn test_get_mux_keys_public_not_found() {
 
     let response = app
         .client()
-        .get(&format!("{}/commit-boost/v1/mux/{}", app.address, name))
+        .get(format!("{}/commit-boost/v1/mux/{}", app.address, name))
         .send()
         .await
         .expect("Failed to send request");
@@ -451,10 +482,12 @@ async fn test_list_mux_configs() {
     let id = TestApp::unique_id();
 
     // Create multiple configs with unique prefix
-    let names: Vec<String> = (1..=3).map(|i| format!("test_mux_list_{}_{}", id, i)).collect();
+    let names: Vec<String> = (1..=3)
+        .map(|i| format!("test_mux_list_{}_{}", id, i))
+        .collect();
     for name in &names {
         app.client()
-            .post(&format!("{}/api/admin/commit-boost/mux", app.address))
+            .post(format!("{}/api/admin/commit-boost/mux", app.address))
             .json(&json!({
                 "name": name
             }))
@@ -466,15 +499,20 @@ async fn test_list_mux_configs() {
     // List all configs
     let response = app
         .client()
-        .get(&format!("{}/api/admin/commit-boost/mux", app.address))
+        .get(format!("{}/api/admin/commit-boost/mux", app.address))
         .send()
         .await
         .expect("Failed to send request");
 
     assert_eq!(response.status(), 200);
 
-    let body: PaginatedResponse<MuxConfigListItem> = response.json().await.expect("Failed to parse JSON");
-    let test_configs: Vec<_> = body.data.iter().filter(|c| c.name.starts_with(&format!("test_mux_list_{}", id))).collect();
+    let body: PaginatedResponse<MuxConfigListItem> =
+        response.json().await.expect("Failed to parse JSON");
+    let test_configs: Vec<_> = body
+        .data
+        .iter()
+        .filter(|c| c.name.starts_with(&format!("test_mux_list_{}", id)))
+        .collect();
     assert_eq!(test_configs.len(), 3);
 
     // Cleanup
@@ -489,10 +527,12 @@ async fn test_mux_pagination() {
     let id = TestApp::unique_id();
 
     // Create 5 configs
-    let names: Vec<String> = (1..=5).map(|i| format!("test_mux_page_{}_{}", id, i)).collect();
+    let names: Vec<String> = (1..=5)
+        .map(|i| format!("test_mux_page_{}_{}", id, i))
+        .collect();
     for name in &names {
         app.client()
-            .post(&format!("{}/api/admin/commit-boost/mux", app.address))
+            .post(format!("{}/api/admin/commit-boost/mux", app.address))
             .json(&json!({
                 "name": name
             }))
@@ -504,7 +544,10 @@ async fn test_mux_pagination() {
     // Test limit
     let response = app
         .client()
-        .get(&format!("{}/api/admin/commit-boost/mux?limit=2", app.address))
+        .get(format!(
+            "{}/api/admin/commit-boost/mux?limit=2",
+            app.address
+        ))
         .send()
         .await
         .expect("Failed to send request");

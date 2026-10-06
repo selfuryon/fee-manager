@@ -1,5 +1,5 @@
 // main.rs
-use fee_manager::{config, create_router, run_migrations, AppState};
+use fee_manager::{AppState, config, create_router, run_migrations};
 use sqlx::postgres::PgPoolOptions;
 use std::sync::Arc;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -10,8 +10,8 @@ async fn main() {
     let config = config::load_config().expect("Failed to load configuration");
 
     // Initialize tracing with conditional JSON format
-    let subscriber = tracing_subscriber::registry()
-        .with(tracing_subscriber::EnvFilter::new(&config.log_level));
+    let subscriber =
+        tracing_subscriber::registry().with(tracing_subscriber::EnvFilter::new(&config.log_level));
 
     if config.log_format == "json" {
         subscriber

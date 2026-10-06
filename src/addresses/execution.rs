@@ -1,7 +1,7 @@
 use hex::FromHex;
+use serde::Deserializer;
 use serde::de::Deserialize;
 use serde::ser::{Serialize, Serializer};
-use serde::Deserializer;
 use sqlx::encode::IsNull;
 use sqlx::error::BoxDynError;
 use sqlx::{Database, Decode, Encode, Postgres, Type};
@@ -16,14 +16,14 @@ pub struct EthAddress(pub [u8; 20]);
 
 impl fmt::Display for EthAddress {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let hex = format!("0x{}", hex::encode(self.0.to_vec()));
+        let hex = format!("0x{}", hex::encode(self.0));
         write!(f, "{}", hex)
     }
 }
 
 impl fmt::Debug for EthAddress {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let hex = format!("0x{}", hex::encode(self.0.to_vec()));
+        let hex = format!("0x{}", hex::encode(self.0));
         write!(f, "{}", hex)
     }
 }
@@ -33,8 +33,8 @@ impl Serialize for EthAddress {
     where
         S: Serializer,
     {
-        let hex = format!("0x{}", hex::encode(self.0.to_vec()));
-        serializer.serialize_str(&hex.as_str())
+        let hex = format!("0x{}", hex::encode(self.0));
+        serializer.serialize_str(hex.as_str())
     }
 }
 
@@ -88,7 +88,7 @@ impl Type<Postgres> for EthAddress {
 impl Encode<'_, Postgres> for EthAddress {
     fn encode_by_ref(
         &self,
-        buf: &mut <Postgres as Database>::ArgumentBuffer<'_>,
+        buf: &mut <Postgres as Database>::ArgumentBuffer,
     ) -> Result<IsNull, BoxDynError> {
         let hex = self.to_string();
         <String as Encode<Postgres>>::encode(hex, buf)

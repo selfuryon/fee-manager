@@ -62,8 +62,12 @@ fn unique_config_name(prefix: &str) -> String {
 
 /// Helper to delete a config (cleanup)
 async fn delete_config(app: &TestApp, name: &str) {
-    let _ = app.client()
-        .delete(&format!("{}/api/admin/vouch/configs/default/{}", app.address, name))
+    let _ = app
+        .client()
+        .delete(format!(
+            "{}/api/admin/vouch/configs/default/{}",
+            app.address, name
+        ))
         .send()
         .await;
 }
@@ -79,7 +83,7 @@ async fn test_create_default_config() {
 
     let response = app
         .client()
-        .post(&format!("{}/api/admin/vouch/configs/default", app.address))
+        .post(format!("{}/api/admin/vouch/configs/default", app.address))
         .json(&json!({
             "name": name,
             "fee_recipient": "0x1234567890abcdef1234567890abcdef12345678",
@@ -95,7 +99,10 @@ async fn test_create_default_config() {
 
     let body: DefaultConfigResponse = response.json().await.expect("Failed to parse JSON");
     assert_eq!(body.name, name);
-    assert_eq!(body.fee_recipient, Some("0x1234567890abcdef1234567890abcdef12345678".to_string()));
+    assert_eq!(
+        body.fee_recipient,
+        Some("0x1234567890abcdef1234567890abcdef12345678".to_string())
+    );
     assert_eq!(body.gas_limit, Some("30000000".to_string()));
     assert!(body.active);
 
@@ -109,7 +116,7 @@ async fn test_create_default_config_with_relays() {
 
     let response = app
         .client()
-        .post(&format!("{}/api/admin/vouch/configs/default", app.address))
+        .post(format!("{}/api/admin/vouch/configs/default", app.address))
         .json(&json!({
             "name": name,
             "fee_recipient": "0x1234567890abcdef1234567890abcdef12345678",
@@ -134,7 +141,10 @@ async fn test_create_default_config_with_relays() {
     // Fetch the config to verify relays
     let get_response = app
         .client()
-        .get(&format!("{}/api/admin/vouch/configs/default/{}", app.address, name))
+        .get(format!(
+            "{}/api/admin/vouch/configs/default/{}",
+            app.address, name
+        ))
         .send()
         .await
         .expect("Failed to get config");
@@ -155,7 +165,7 @@ async fn test_create_default_config_duplicate() {
     // Create first config
     let _ = app
         .client()
-        .post(&format!("{}/api/admin/vouch/configs/default", app.address))
+        .post(format!("{}/api/admin/vouch/configs/default", app.address))
         .json(&json!({
             "name": name,
             "active": true
@@ -167,7 +177,7 @@ async fn test_create_default_config_duplicate() {
     // Try to create duplicate
     let response = app
         .client()
-        .post(&format!("{}/api/admin/vouch/configs/default", app.address))
+        .post(format!("{}/api/admin/vouch/configs/default", app.address))
         .json(&json!({
             "name": name,
             "active": true
@@ -188,7 +198,7 @@ async fn test_get_default_config() {
 
     // Create config
     app.client()
-        .post(&format!("{}/api/admin/vouch/configs/default", app.address))
+        .post(format!("{}/api/admin/vouch/configs/default", app.address))
         .json(&json!({
             "name": name,
             "gas_limit": "32000000",
@@ -201,7 +211,10 @@ async fn test_get_default_config() {
     // Get config
     let response = app
         .client()
-        .get(&format!("{}/api/admin/vouch/configs/default/{}", app.address, name))
+        .get(format!(
+            "{}/api/admin/vouch/configs/default/{}",
+            app.address, name
+        ))
         .send()
         .await
         .expect("Failed to send request");
@@ -222,7 +235,10 @@ async fn test_get_default_config_not_found() {
 
     let response = app
         .client()
-        .get(&format!("{}/api/admin/vouch/configs/default/{}", app.address, name))
+        .get(format!(
+            "{}/api/admin/vouch/configs/default/{}",
+            app.address, name
+        ))
         .send()
         .await
         .expect("Failed to send request");
@@ -236,8 +252,9 @@ async fn test_update_default_config() {
     let name = unique_config_name("update");
 
     // Create config
-    let create_resp = app.client()
-        .post(&format!("{}/api/admin/vouch/configs/default", app.address))
+    let create_resp = app
+        .client()
+        .post(format!("{}/api/admin/vouch/configs/default", app.address))
         .json(&json!({
             "name": name,
             "gas_limit": "30000000",
@@ -247,12 +264,19 @@ async fn test_update_default_config() {
         .await
         .expect("Failed to create config");
 
-    assert_eq!(create_resp.status(), 201, "Failed to create config for update test");
+    assert_eq!(
+        create_resp.status(),
+        201,
+        "Failed to create config for update test"
+    );
 
     // Update config
     let response = app
         .client()
-        .put(&format!("{}/api/admin/vouch/configs/default/{}", app.address, name))
+        .put(format!(
+            "{}/api/admin/vouch/configs/default/{}",
+            app.address, name
+        ))
         .json(&json!({
             "gas_limit": "35000000",
             "active": false
@@ -277,7 +301,7 @@ async fn test_delete_default_config() {
 
     // Create config
     app.client()
-        .post(&format!("{}/api/admin/vouch/configs/default", app.address))
+        .post(format!("{}/api/admin/vouch/configs/default", app.address))
         .json(&json!({
             "name": name,
             "active": true
@@ -289,7 +313,10 @@ async fn test_delete_default_config() {
     // Delete config
     let response = app
         .client()
-        .delete(&format!("{}/api/admin/vouch/configs/default/{}", app.address, name))
+        .delete(format!(
+            "{}/api/admin/vouch/configs/default/{}",
+            app.address, name
+        ))
         .send()
         .await
         .expect("Failed to send request");
@@ -299,7 +326,10 @@ async fn test_delete_default_config() {
     // Verify deleted
     let response = app
         .client()
-        .get(&format!("{}/api/admin/vouch/configs/default/{}", app.address, name))
+        .get(format!(
+            "{}/api/admin/vouch/configs/default/{}",
+            app.address, name
+        ))
         .send()
         .await
         .expect("Failed to send request");
@@ -315,12 +345,15 @@ async fn test_delete_default_config() {
 async fn test_list_default_configs() {
     let app = TestApp::get().await;
     let prefix = TestApp::unique_id();
-    let names: Vec<String> = (1..=3).map(|i| format!("test_list_{}_{}", prefix, i)).collect();
+    let names: Vec<String> = (1..=3)
+        .map(|i| format!("test_list_{}_{}", prefix, i))
+        .collect();
 
     // Create multiple configs
     for (i, name) in names.iter().enumerate() {
-        let resp = app.client()
-            .post(&format!("{}/api/admin/vouch/configs/default", app.address))
+        let resp = app
+            .client()
+            .post(format!("{}/api/admin/vouch/configs/default", app.address))
             .json(&json!({
                 "name": name,
                 "gas_limit": format!("{}0000000", 30 + i),
@@ -335,14 +368,18 @@ async fn test_list_default_configs() {
     // List all test configs
     let response = app
         .client()
-        .get(&format!("{}/api/admin/vouch/configs/default?name=test_list_{}", app.address, prefix))
+        .get(format!(
+            "{}/api/admin/vouch/configs/default?name=test_list_{}",
+            app.address, prefix
+        ))
         .send()
         .await
         .expect("Failed to send request");
 
     assert_eq!(response.status(), 200);
 
-    let body: PaginatedResponse<DefaultConfigListItem> = response.json().await.expect("Failed to parse JSON");
+    let body: PaginatedResponse<DefaultConfigListItem> =
+        response.json().await.expect("Failed to parse JSON");
     assert_eq!(body.data.len(), 3);
 
     // Cleanup
@@ -355,13 +392,15 @@ async fn test_list_default_configs() {
 async fn test_filter_by_active() {
     let app = TestApp::get().await;
     let prefix = TestApp::unique_id();
-    let names: Vec<String> = (1..=3).map(|i| format!("test_active_{}_{}", prefix, i)).collect();
+    let names: Vec<String> = (1..=3)
+        .map(|i| format!("test_active_{}_{}", prefix, i))
+        .collect();
 
     // Create configs with different active states
     for (i, name) in names.iter().enumerate() {
         app.client()
-            .post(&format!("{}/api/admin/vouch/configs/default", app.address))
-            .json(&json!({ "name": name, "active": i != 1 }))  // 0,2 = true, 1 = false
+            .post(format!("{}/api/admin/vouch/configs/default", app.address))
+            .json(&json!({ "name": name, "active": i != 1 })) // 0,2 = true, 1 = false
             .send()
             .await
             .unwrap();
@@ -370,7 +409,10 @@ async fn test_filter_by_active() {
     // Filter active only
     let response = app
         .client()
-        .get(&format!("{}/api/admin/vouch/configs/default?name=test_active_{}&active=true", app.address, prefix))
+        .get(format!(
+            "{}/api/admin/vouch/configs/default?name=test_active_{}&active=true",
+            app.address, prefix
+        ))
         .send()
         .await
         .expect("Failed to send request");
@@ -382,7 +424,10 @@ async fn test_filter_by_active() {
     // Filter inactive only
     let response = app
         .client()
-        .get(&format!("{}/api/admin/vouch/configs/default?name=test_active_{}&active=false", app.address, prefix))
+        .get(format!(
+            "{}/api/admin/vouch/configs/default?name=test_active_{}&active=false",
+            app.address, prefix
+        ))
         .send()
         .await
         .expect("Failed to send request");
@@ -401,25 +446,27 @@ async fn test_filter_by_active() {
 async fn test_filter_by_gas_limit() {
     let app = TestApp::get().await;
     let prefix = TestApp::unique_id();
-    let names: Vec<String> = (1..=3).map(|i| format!("test_gas_{}_{}", prefix, i)).collect();
+    let names: Vec<String> = (1..=3)
+        .map(|i| format!("test_gas_{}_{}", prefix, i))
+        .collect();
 
     // Create configs with different gas limits
     app.client()
-        .post(&format!("{}/api/admin/vouch/configs/default", app.address))
+        .post(format!("{}/api/admin/vouch/configs/default", app.address))
         .json(&json!({ "name": &names[0], "gas_limit": "30000000", "active": true }))
         .send()
         .await
         .unwrap();
 
     app.client()
-        .post(&format!("{}/api/admin/vouch/configs/default", app.address))
+        .post(format!("{}/api/admin/vouch/configs/default", app.address))
         .json(&json!({ "name": &names[1], "gas_limit": "35000000", "active": true }))
         .send()
         .await
         .unwrap();
 
     app.client()
-        .post(&format!("{}/api/admin/vouch/configs/default", app.address))
+        .post(format!("{}/api/admin/vouch/configs/default", app.address))
         .json(&json!({ "name": &names[2], "gas_limit": "30000000", "active": true }))
         .send()
         .await
@@ -428,14 +475,21 @@ async fn test_filter_by_gas_limit() {
     // Filter by gas_limit
     let response = app
         .client()
-        .get(&format!("{}/api/admin/vouch/configs/default?name=test_gas_{}&gas_limit=30000000", app.address, prefix))
+        .get(format!(
+            "{}/api/admin/vouch/configs/default?name=test_gas_{}&gas_limit=30000000",
+            app.address, prefix
+        ))
         .send()
         .await
         .expect("Failed to send request");
 
     let body: PaginatedResponse<DefaultConfigListItem> = response.json().await.unwrap();
     assert_eq!(body.data.len(), 2);
-    assert!(body.data.iter().all(|c| c.gas_limit == Some("30000000".to_string())));
+    assert!(
+        body.data
+            .iter()
+            .all(|c| c.gas_limit == Some("30000000".to_string()))
+    );
 
     // Cleanup
     for name in &names {
@@ -447,12 +501,14 @@ async fn test_filter_by_gas_limit() {
 async fn test_pagination() {
     let app = TestApp::get().await;
     let prefix = TestApp::unique_id();
-    let names: Vec<String> = (1..=5).map(|i| format!("test_page_{}_{}", prefix, i)).collect();
+    let names: Vec<String> = (1..=5)
+        .map(|i| format!("test_page_{}_{}", prefix, i))
+        .collect();
 
     // Create 5 configs
     for name in &names {
         app.client()
-            .post(&format!("{}/api/admin/vouch/configs/default", app.address))
+            .post(format!("{}/api/admin/vouch/configs/default", app.address))
             .json(&json!({ "name": name, "active": true }))
             .send()
             .await
@@ -462,7 +518,10 @@ async fn test_pagination() {
     // Test limit
     let response = app
         .client()
-        .get(&format!("{}/api/admin/vouch/configs/default?name=test_page_{}&limit=2", app.address, prefix))
+        .get(format!(
+            "{}/api/admin/vouch/configs/default?name=test_page_{}&limit=2",
+            app.address, prefix
+        ))
         .send()
         .await
         .expect("Failed to send request");
@@ -475,7 +534,10 @@ async fn test_pagination() {
     // Test offset
     let response = app
         .client()
-        .get(&format!("{}/api/admin/vouch/configs/default?name=test_page_{}&limit=2&offset=2", app.address, prefix))
+        .get(format!(
+            "{}/api/admin/vouch/configs/default?name=test_page_{}&limit=2&offset=2",
+            app.address, prefix
+        ))
         .send()
         .await
         .expect("Failed to send request");
@@ -503,7 +565,7 @@ async fn test_filter_by_relay_url() {
 
     // Create config with relay
     app.client()
-        .post(&format!("{}/api/admin/vouch/configs/default", app.address))
+        .post(format!("{}/api/admin/vouch/configs/default", app.address))
         .json(&json!({
             "name": name_with_relay,
             "active": true,
@@ -519,7 +581,7 @@ async fn test_filter_by_relay_url() {
 
     // Create config without relay
     app.client()
-        .post(&format!("{}/api/admin/vouch/configs/default", app.address))
+        .post(format!("{}/api/admin/vouch/configs/default", app.address))
         .json(&json!({
             "name": name_without_relay,
             "active": true
@@ -531,7 +593,7 @@ async fn test_filter_by_relay_url() {
     // Filter by relay_url prefix
     let response = app
         .client()
-        .get(&format!(
+        .get(format!(
             "{}/api/admin/vouch/configs/default?name=test_relay_url_{}&relay_url=https://flashbots",
             app.address, prefix
         ))
@@ -558,7 +620,7 @@ async fn test_filter_by_relay_min_value() {
 
     // Create config with relay that has min_value
     app.client()
-        .post(&format!("{}/api/admin/vouch/configs/default", app.address))
+        .post(format!("{}/api/admin/vouch/configs/default", app.address))
         .json(&json!({
             "name": name_with_min,
             "active": true,
@@ -575,7 +637,7 @@ async fn test_filter_by_relay_min_value() {
 
     // Create config with relay without min_value
     app.client()
-        .post(&format!("{}/api/admin/vouch/configs/default", app.address))
+        .post(format!("{}/api/admin/vouch/configs/default", app.address))
         .json(&json!({
             "name": name_without_min,
             "active": true,
@@ -592,7 +654,7 @@ async fn test_filter_by_relay_min_value() {
     // Filter by relay_min_value
     let response = app
         .client()
-        .get(&format!(
+        .get(format!(
             "{}/api/admin/vouch/configs/default?name=test_relay_min_{}&relay_min_value=50000000000000000",
             app.address, prefix
         ))

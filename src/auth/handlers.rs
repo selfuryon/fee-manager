@@ -3,18 +3,18 @@
 use std::sync::Arc;
 
 use axum::{
+    Json, Router,
     extract::{Path, State},
     routing::{delete, get},
-    Json, Router,
 };
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use super::{service, TokenInfo};
+use super::{TokenInfo, service};
 use crate::audit::{AuditAction, AuditChanges, RequestContext, ResourceType};
 use crate::audit_log;
-use crate::{errors::ApiError, AppState};
+use crate::{AppState, errors::ApiError};
 
 /// Request body for creating a new token
 #[derive(Debug, Deserialize, ToSchema)]
@@ -88,7 +88,13 @@ pub async fn create_token(
             name: Some(token.name.clone()),
             ..Default::default()
         };
-        audit_log!(ctx, AuditAction::Create, ResourceType::AuthToken, token.id.to_string(), changes);
+        audit_log!(
+            ctx,
+            AuditAction::Create,
+            ResourceType::AuthToken,
+            token.id.to_string(),
+            changes
+        );
     }
 
     Ok(Json(CreateTokenResponse {
@@ -124,7 +130,12 @@ pub async fn delete_token(
     if deleted {
         // Audit log
         if state.config.audit_enabled {
-            audit_log!(ctx, AuditAction::Delete, ResourceType::AuthToken, id.to_string());
+            audit_log!(
+                ctx,
+                AuditAction::Delete,
+                ResourceType::AuthToken,
+                id.to_string()
+            );
         }
         Ok(axum::http::StatusCode::NO_CONTENT)
     } else {

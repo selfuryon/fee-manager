@@ -56,8 +56,12 @@ struct PaginatedResponse<T> {
 
 /// Helper to delete a proposer
 async fn delete_proposer(app: &TestApp, pubkey: &str) {
-    let _ = app.client()
-        .delete(&format!("{}/api/admin/vouch/proposers/{}", app.address, pubkey))
+    let _ = app
+        .client()
+        .delete(format!(
+            "{}/api/admin/vouch/proposers/{}",
+            app.address, pubkey
+        ))
         .send()
         .await;
 }
@@ -73,7 +77,10 @@ async fn test_create_proposer() {
 
     let response = app
         .client()
-        .put(&format!("{}/api/admin/vouch/proposers/{}", app.address, pubkey))
+        .put(format!(
+            "{}/api/admin/vouch/proposers/{}",
+            app.address, pubkey
+        ))
         .json(&json!({
             "fee_recipient": "0x1234567890abcdef1234567890abcdef12345678",
             "gas_limit": "30000000",
@@ -89,7 +96,10 @@ async fn test_create_proposer() {
 
     let body: ProposerResponse = response.json().await.expect("Failed to parse JSON");
     assert_eq!(body.public_key, pubkey);
-    assert_eq!(body.fee_recipient, Some("0x1234567890abcdef1234567890abcdef12345678".to_string()));
+    assert_eq!(
+        body.fee_recipient,
+        Some("0x1234567890abcdef1234567890abcdef12345678".to_string())
+    );
     assert_eq!(body.gas_limit, Some("30000000".to_string()));
     assert!(!body.reset_relays);
 
@@ -103,7 +113,7 @@ async fn test_create_proposer_with_relays() {
 
     let response = app
         .client()
-        .put(&format!("{}/api/admin/vouch/proposers/{}", app.address, pubkey))
+        .put(format!("{}/api/admin/vouch/proposers/{}", app.address, pubkey))
         .json(&json!({
             "fee_recipient": "0x1234567890abcdef1234567890abcdef12345678",
             "reset_relays": true,
@@ -139,7 +149,10 @@ async fn test_get_proposer() {
 
     // Create proposer
     app.client()
-        .put(&format!("{}/api/admin/vouch/proposers/{}", app.address, pubkey))
+        .put(format!(
+            "{}/api/admin/vouch/proposers/{}",
+            app.address, pubkey
+        ))
         .json(&json!({
             "gas_limit": "32000000"
         }))
@@ -150,7 +163,10 @@ async fn test_get_proposer() {
     // Get proposer
     let response = app
         .client()
-        .get(&format!("{}/api/admin/vouch/proposers/{}", app.address, pubkey))
+        .get(format!(
+            "{}/api/admin/vouch/proposers/{}",
+            app.address, pubkey
+        ))
         .send()
         .await
         .expect("Failed to send request");
@@ -171,7 +187,10 @@ async fn test_get_proposer_not_found() {
 
     let response = app
         .client()
-        .get(&format!("{}/api/admin/vouch/proposers/{}", app.address, pubkey))
+        .get(format!(
+            "{}/api/admin/vouch/proposers/{}",
+            app.address, pubkey
+        ))
         .send()
         .await
         .expect("Failed to send request");
@@ -186,7 +205,10 @@ async fn test_update_proposer() {
 
     // Create proposer
     app.client()
-        .put(&format!("{}/api/admin/vouch/proposers/{}", app.address, pubkey))
+        .put(format!(
+            "{}/api/admin/vouch/proposers/{}",
+            app.address, pubkey
+        ))
         .json(&json!({
             "gas_limit": "30000000",
             "reset_relays": false
@@ -198,7 +220,10 @@ async fn test_update_proposer() {
     // Update proposer
     let response = app
         .client()
-        .put(&format!("{}/api/admin/vouch/proposers/{}", app.address, pubkey))
+        .put(format!(
+            "{}/api/admin/vouch/proposers/{}",
+            app.address, pubkey
+        ))
         .json(&json!({
             "gas_limit": "35000000",
             "reset_relays": true
@@ -223,7 +248,10 @@ async fn test_delete_proposer() {
 
     // Create proposer
     app.client()
-        .put(&format!("{}/api/admin/vouch/proposers/{}", app.address, pubkey))
+        .put(format!(
+            "{}/api/admin/vouch/proposers/{}",
+            app.address, pubkey
+        ))
         .json(&json!({}))
         .send()
         .await
@@ -232,7 +260,10 @@ async fn test_delete_proposer() {
     // Delete proposer
     let response = app
         .client()
-        .delete(&format!("{}/api/admin/vouch/proposers/{}", app.address, pubkey))
+        .delete(format!(
+            "{}/api/admin/vouch/proposers/{}",
+            app.address, pubkey
+        ))
         .send()
         .await
         .expect("Failed to send request");
@@ -242,7 +273,10 @@ async fn test_delete_proposer() {
     // Verify deleted
     let response = app
         .client()
-        .get(&format!("{}/api/admin/vouch/proposers/{}", app.address, pubkey))
+        .get(format!(
+            "{}/api/admin/vouch/proposers/{}",
+            app.address, pubkey
+        ))
         .send()
         .await
         .expect("Failed to send request");
@@ -260,11 +294,16 @@ async fn test_list_proposers() {
     let id = TestApp::unique_id();
 
     // Create multiple proposers - using hex-only prefix
-    let prefix = format!("aa{}", id);  // aa + hex id
-    let pubkeys: Vec<String> = (1..=3).map(|i| TestApp::test_bls_pubkey(&format!("{}0{}", prefix, i))).collect();
+    let prefix = format!("aa{}", id); // aa + hex id
+    let pubkeys: Vec<String> = (1..=3)
+        .map(|i| TestApp::test_bls_pubkey(&format!("{}0{}", prefix, i)))
+        .collect();
     for (i, pubkey) in pubkeys.iter().enumerate() {
         app.client()
-            .put(&format!("{}/api/admin/vouch/proposers/{}", app.address, pubkey))
+            .put(format!(
+                "{}/api/admin/vouch/proposers/{}",
+                app.address, pubkey
+            ))
             .json(&json!({
                 "gas_limit": format!("{}0000000", 30 + i),
                 "reset_relays": i % 2 == 0
@@ -277,14 +316,18 @@ async fn test_list_proposers() {
     // List all test proposers - use hex prefix for filtering
     let response = app
         .client()
-        .get(&format!("{}/api/admin/vouch/proposers?public_key=0xdead{}", app.address, prefix))
+        .get(format!(
+            "{}/api/admin/vouch/proposers?public_key=0xdead{}",
+            app.address, prefix
+        ))
         .send()
         .await
         .expect("Failed to send request");
 
     assert_eq!(response.status(), 200);
 
-    let body: PaginatedResponse<ProposerListItem> = response.json().await.expect("Failed to parse JSON");
+    let body: PaginatedResponse<ProposerListItem> =
+        response.json().await.expect("Failed to parse JSON");
     assert_eq!(body.data.len(), 3);
 
     // Cleanup
@@ -300,10 +343,15 @@ async fn test_filter_by_reset_relays() {
 
     // Create proposers with different reset_relays values - hex prefix
     let prefix = format!("bb{}", id);
-    let pubkeys: Vec<String> = (1..=4).map(|i| TestApp::test_bls_pubkey(&format!("{}0{}", prefix, i))).collect();
+    let pubkeys: Vec<String> = (1..=4)
+        .map(|i| TestApp::test_bls_pubkey(&format!("{}0{}", prefix, i)))
+        .collect();
     for (i, pubkey) in pubkeys.iter().enumerate() {
         app.client()
-            .put(&format!("{}/api/admin/vouch/proposers/{}", app.address, pubkey))
+            .put(format!(
+                "{}/api/admin/vouch/proposers/{}",
+                app.address, pubkey
+            ))
             .json(&json!({
                 "reset_relays": (i + 1) % 2 == 0  // 2,4 = true
             }))
@@ -315,7 +363,10 @@ async fn test_filter_by_reset_relays() {
     // Filter reset_relays = true
     let response = app
         .client()
-        .get(&format!("{}/api/admin/vouch/proposers?public_key=0xdead{}&reset_relays=true", app.address, prefix))
+        .get(format!(
+            "{}/api/admin/vouch/proposers?public_key=0xdead{}&reset_relays=true",
+            app.address, prefix
+        ))
         .send()
         .await
         .expect("Failed to send request");
@@ -327,7 +378,10 @@ async fn test_filter_by_reset_relays() {
     // Filter reset_relays = false
     let response = app
         .client()
-        .get(&format!("{}/api/admin/vouch/proposers?public_key=0xdead{}&reset_relays=false", app.address, prefix))
+        .get(format!(
+            "{}/api/admin/vouch/proposers?public_key=0xdead{}&reset_relays=false",
+            app.address, prefix
+        ))
         .send()
         .await
         .expect("Failed to send request");
@@ -354,7 +408,10 @@ async fn test_filter_by_public_key_prefix() {
 
     for pubkey in [&pubkey1, &pubkey2, &pubkey3] {
         app.client()
-            .put(&format!("{}/api/admin/vouch/proposers/{}", app.address, pubkey))
+            .put(format!(
+                "{}/api/admin/vouch/proposers/{}",
+                app.address, pubkey
+            ))
             .json(&json!({}))
             .send()
             .await
@@ -364,14 +421,24 @@ async fn test_filter_by_public_key_prefix() {
     // Filter by prefix "cc" - should match cc1 and cc2
     let response = app
         .client()
-        .get(&format!("{}/api/admin/vouch/proposers?public_key=0xdeadcc", app.address))
+        .get(format!(
+            "{}/api/admin/vouch/proposers?public_key=0xdeadcc",
+            app.address
+        ))
         .send()
         .await
         .expect("Failed to send request");
 
     let body: PaginatedResponse<ProposerListItem> = response.json().await.unwrap();
     // Filter matches both cc1 and cc2
-    let matching: Vec<_> = body.data.iter().filter(|p| p.public_key.contains(&format!("cc1{}", id)) || p.public_key.contains(&format!("cc2{}", id))).collect();
+    let matching: Vec<_> = body
+        .data
+        .iter()
+        .filter(|p| {
+            p.public_key.contains(&format!("cc1{}", id))
+                || p.public_key.contains(&format!("cc2{}", id))
+        })
+        .collect();
     assert_eq!(matching.len(), 2);
 
     // Cleanup
@@ -387,10 +454,15 @@ async fn test_proposers_pagination() {
 
     // Create 5 proposers - hex prefix for filtering
     let prefix = format!("ee{}", id);
-    let pubkeys: Vec<String> = (1..=5).map(|i| TestApp::test_bls_pubkey(&format!("{}0{}", prefix, i))).collect();
+    let pubkeys: Vec<String> = (1..=5)
+        .map(|i| TestApp::test_bls_pubkey(&format!("{}0{}", prefix, i)))
+        .collect();
     for pubkey in &pubkeys {
         app.client()
-            .put(&format!("{}/api/admin/vouch/proposers/{}", app.address, pubkey))
+            .put(format!(
+                "{}/api/admin/vouch/proposers/{}",
+                app.address, pubkey
+            ))
             .json(&json!({}))
             .send()
             .await
@@ -400,7 +472,10 @@ async fn test_proposers_pagination() {
     // Test limit
     let response = app
         .client()
-        .get(&format!("{}/api/admin/vouch/proposers?public_key=0xdead{}&limit=2", app.address, prefix))
+        .get(format!(
+            "{}/api/admin/vouch/proposers?public_key=0xdead{}&limit=2",
+            app.address, prefix
+        ))
         .send()
         .await
         .expect("Failed to send request");
@@ -413,7 +488,10 @@ async fn test_proposers_pagination() {
     // Test offset
     let response = app
         .client()
-        .get(&format!("{}/api/admin/vouch/proposers?public_key=0xdead{}&limit=2&offset=3", app.address, prefix))
+        .get(format!(
+            "{}/api/admin/vouch/proposers?public_key=0xdead{}&limit=2&offset=3",
+            app.address, prefix
+        ))
         .send()
         .await
         .expect("Failed to send request");
@@ -443,7 +521,7 @@ async fn test_filter_proposers_by_relay_url() {
 
     // Create proposer with relay
     app.client()
-        .put(&format!("{}/api/admin/vouch/proposers/{}", app.address, pubkey_with_relay))
+        .put(format!("{}/api/admin/vouch/proposers/{}", app.address, pubkey_with_relay))
         .json(&json!({
             "relays": {
                 "https://flashbots.example.com": {
@@ -457,7 +535,10 @@ async fn test_filter_proposers_by_relay_url() {
 
     // Create proposer without relay
     app.client()
-        .put(&format!("{}/api/admin/vouch/proposers/{}", app.address, pubkey_without_relay))
+        .put(format!(
+            "{}/api/admin/vouch/proposers/{}",
+            app.address, pubkey_without_relay
+        ))
         .json(&json!({}))
         .send()
         .await
@@ -466,7 +547,7 @@ async fn test_filter_proposers_by_relay_url() {
     // Filter by relay_url prefix
     let response = app
         .client()
-        .get(&format!(
+        .get(format!(
             "{}/api/admin/vouch/proposers?public_key=0xdead{}&relay_url=https://flashbots",
             app.address, prefix
         ))
@@ -495,7 +576,7 @@ async fn test_filter_proposers_by_relay_min_value() {
 
     // Create proposer with relay that has min_value
     app.client()
-        .put(&format!("{}/api/admin/vouch/proposers/{}", app.address, pubkey_with_min))
+        .put(format!("{}/api/admin/vouch/proposers/{}", app.address, pubkey_with_min))
         .json(&json!({
             "relays": {
                 "https://relay1.example.com": {
@@ -510,7 +591,7 @@ async fn test_filter_proposers_by_relay_min_value() {
 
     // Create proposer with relay without min_value
     app.client()
-        .put(&format!("{}/api/admin/vouch/proposers/{}", app.address, pubkey_without_min))
+        .put(format!("{}/api/admin/vouch/proposers/{}", app.address, pubkey_without_min))
         .json(&json!({
             "relays": {
                 "https://relay2.example.com": {
@@ -525,7 +606,7 @@ async fn test_filter_proposers_by_relay_min_value() {
     // Filter by relay_min_value
     let response = app
         .client()
-        .get(&format!(
+        .get(format!(
             "{}/api/admin/vouch/proposers?public_key=0xdead{}&relay_min_value=99000000000000000",
             app.address, prefix
         ))
@@ -554,7 +635,7 @@ async fn test_filter_proposers_by_relay_disabled() {
 
     // Create proposer with disabled relay
     app.client()
-        .put(&format!("{}/api/admin/vouch/proposers/{}", app.address, pubkey_disabled))
+        .put(format!("{}/api/admin/vouch/proposers/{}", app.address, pubkey_disabled))
         .json(&json!({
             "relays": {
                 "https://relay1.example.com": {
@@ -569,7 +650,7 @@ async fn test_filter_proposers_by_relay_disabled() {
 
     // Create proposer with enabled relay
     app.client()
-        .put(&format!("{}/api/admin/vouch/proposers/{}", app.address, pubkey_enabled))
+        .put(format!("{}/api/admin/vouch/proposers/{}", app.address, pubkey_enabled))
         .json(&json!({
             "relays": {
                 "https://relay2.example.com": {
@@ -585,7 +666,7 @@ async fn test_filter_proposers_by_relay_disabled() {
     // Filter by relay_disabled=true
     let response = app
         .client()
-        .get(&format!(
+        .get(format!(
             "{}/api/admin/vouch/proposers?public_key=0xdead{}&relay_disabled=true",
             app.address, prefix
         ))
@@ -601,7 +682,7 @@ async fn test_filter_proposers_by_relay_disabled() {
     // Filter by relay_disabled=false
     let response = app
         .client()
-        .get(&format!(
+        .get(format!(
             "{}/api/admin/vouch/proposers?public_key=0xdead{}&relay_disabled=false",
             app.address, prefix
         ))

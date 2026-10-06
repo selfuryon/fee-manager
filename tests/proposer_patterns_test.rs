@@ -63,8 +63,12 @@ fn unique_pattern_name(prefix: &str) -> String {
 
 /// Helper to delete a pattern
 async fn delete_pattern(app: &TestApp, name: &str) {
-    let _ = app.client()
-        .delete(&format!("{}/api/admin/vouch/proposer-patterns/{}", app.address, name))
+    let _ = app
+        .client()
+        .delete(format!(
+            "{}/api/admin/vouch/proposer-patterns/{}",
+            app.address, name
+        ))
         .send()
         .await;
 }
@@ -80,7 +84,7 @@ async fn test_create_proposer_pattern() {
 
     let response = app
         .client()
-        .post(&format!("{}/api/admin/vouch/proposer-patterns", app.address))
+        .post(format!("{}/api/admin/vouch/proposer-patterns", app.address))
         .json(&json!({
             "name": name,
             "pattern": "^0x8[0-9a-f]{94}$",
@@ -111,7 +115,7 @@ async fn test_create_proposer_pattern_with_relays() {
 
     let response = app
         .client()
-        .post(&format!("{}/api/admin/vouch/proposer-patterns", app.address))
+        .post(format!("{}/api/admin/vouch/proposer-patterns", app.address))
         .json(&json!({
             "name": name,
             "pattern": "^0x9[0-9a-f]{94}$",
@@ -147,7 +151,7 @@ async fn test_create_proposer_pattern_duplicate() {
 
     // Create first pattern
     app.client()
-        .post(&format!("{}/api/admin/vouch/proposer-patterns", app.address))
+        .post(format!("{}/api/admin/vouch/proposer-patterns", app.address))
         .json(&json!({
             "name": name,
             "pattern": "^0x[0-9a-f]+$"
@@ -159,7 +163,7 @@ async fn test_create_proposer_pattern_duplicate() {
     // Try to create duplicate
     let response = app
         .client()
-        .post(&format!("{}/api/admin/vouch/proposer-patterns", app.address))
+        .post(format!("{}/api/admin/vouch/proposer-patterns", app.address))
         .json(&json!({
             "name": name,
             "pattern": "^0x[0-9a-f]+$"
@@ -180,7 +184,7 @@ async fn test_get_proposer_pattern() {
 
     // Create pattern
     app.client()
-        .post(&format!("{}/api/admin/vouch/proposer-patterns", app.address))
+        .post(format!("{}/api/admin/vouch/proposer-patterns", app.address))
         .json(&json!({
             "name": name,
             "pattern": "^0xa[0-9a-f]{94}$",
@@ -193,7 +197,10 @@ async fn test_get_proposer_pattern() {
     // Get pattern
     let response = app
         .client()
-        .get(&format!("{}/api/admin/vouch/proposer-patterns/{}", app.address, name))
+        .get(format!(
+            "{}/api/admin/vouch/proposer-patterns/{}",
+            app.address, name
+        ))
         .send()
         .await
         .expect("Failed to send request");
@@ -215,7 +222,10 @@ async fn test_get_proposer_pattern_not_found() {
 
     let response = app
         .client()
-        .get(&format!("{}/api/admin/vouch/proposer-patterns/{}", app.address, name))
+        .get(format!(
+            "{}/api/admin/vouch/proposer-patterns/{}",
+            app.address, name
+        ))
         .send()
         .await
         .expect("Failed to send request");
@@ -230,7 +240,7 @@ async fn test_update_proposer_pattern() {
 
     // Create pattern
     app.client()
-        .post(&format!("{}/api/admin/vouch/proposer-patterns", app.address))
+        .post(format!("{}/api/admin/vouch/proposer-patterns", app.address))
         .json(&json!({
             "name": name,
             "pattern": "^0xb[0-9a-f]{94}$",
@@ -244,7 +254,10 @@ async fn test_update_proposer_pattern() {
     // Update pattern
     let response = app
         .client()
-        .put(&format!("{}/api/admin/vouch/proposer-patterns/{}", app.address, name))
+        .put(format!(
+            "{}/api/admin/vouch/proposer-patterns/{}",
+            app.address, name
+        ))
         .json(&json!({
             "pattern": "^0xc[0-9a-f]{94}$",
             "tags": ["solo", "home-staker"],
@@ -271,7 +284,7 @@ async fn test_delete_proposer_pattern() {
 
     // Create pattern
     app.client()
-        .post(&format!("{}/api/admin/vouch/proposer-patterns", app.address))
+        .post(format!("{}/api/admin/vouch/proposer-patterns", app.address))
         .json(&json!({
             "name": name,
             "pattern": "^0x[0-9a-f]+$"
@@ -283,7 +296,10 @@ async fn test_delete_proposer_pattern() {
     // Delete pattern
     let response = app
         .client()
-        .delete(&format!("{}/api/admin/vouch/proposer-patterns/{}", app.address, name))
+        .delete(format!(
+            "{}/api/admin/vouch/proposer-patterns/{}",
+            app.address, name
+        ))
         .send()
         .await
         .expect("Failed to send request");
@@ -293,7 +309,10 @@ async fn test_delete_proposer_pattern() {
     // Verify deleted
     let response = app
         .client()
-        .get(&format!("{}/api/admin/vouch/proposer-patterns/{}", app.address, name))
+        .get(format!(
+            "{}/api/admin/vouch/proposer-patterns/{}",
+            app.address, name
+        ))
         .send()
         .await
         .expect("Failed to send request");
@@ -314,7 +333,7 @@ async fn test_list_proposer_patterns() {
     let names: Vec<String> = (1..=3).map(|i| format!("test_list_{}_{}", id, i)).collect();
     for (i, name) in names.iter().enumerate() {
         app.client()
-            .post(&format!("{}/api/admin/vouch/proposer-patterns", app.address))
+            .post(format!("{}/api/admin/vouch/proposer-patterns", app.address))
             .json(&json!({
                 "name": name,
                 "pattern": format!("^0x{}[0-9a-f]{{94}}$", i),
@@ -328,14 +347,18 @@ async fn test_list_proposer_patterns() {
     // List all test patterns
     let response = app
         .client()
-        .get(&format!("{}/api/admin/vouch/proposer-patterns?name=test_list_{}", app.address, id))
+        .get(format!(
+            "{}/api/admin/vouch/proposer-patterns?name=test_list_{}",
+            app.address, id
+        ))
         .send()
         .await
         .expect("Failed to send request");
 
     assert_eq!(response.status(), 200);
 
-    let body: PaginatedResponse<ProposerPatternListItem> = response.json().await.expect("Failed to parse JSON");
+    let body: PaginatedResponse<ProposerPatternListItem> =
+        response.json().await.expect("Failed to parse JSON");
     assert_eq!(body.data.len(), 3);
 
     // Cleanup
@@ -355,7 +378,7 @@ async fn test_filter_by_tag() {
     let name3 = format!("test_tag_{}_{}", id, 3);
 
     app.client()
-        .post(&format!("{}/api/admin/vouch/proposer-patterns", app.address))
+        .post(format!("{}/api/admin/vouch/proposer-patterns", app.address))
         .json(&json!({
             "name": name1,
             "pattern": "^0x1[0-9a-f]{94}$",
@@ -366,7 +389,7 @@ async fn test_filter_by_tag() {
         .unwrap();
 
     app.client()
-        .post(&format!("{}/api/admin/vouch/proposer-patterns", app.address))
+        .post(format!("{}/api/admin/vouch/proposer-patterns", app.address))
         .json(&json!({
             "name": name2,
             "pattern": "^0x2[0-9a-f]{94}$",
@@ -377,7 +400,7 @@ async fn test_filter_by_tag() {
         .unwrap();
 
     app.client()
-        .post(&format!("{}/api/admin/vouch/proposer-patterns", app.address))
+        .post(format!("{}/api/admin/vouch/proposer-patterns", app.address))
         .json(&json!({
             "name": name3,
             "pattern": "^0x3[0-9a-f]{94}$",
@@ -390,19 +413,29 @@ async fn test_filter_by_tag() {
     // Filter by tag "lido"
     let response = app
         .client()
-        .get(&format!("{}/api/admin/vouch/proposer-patterns?name=test_tag_{}&tag=lido", app.address, id))
+        .get(format!(
+            "{}/api/admin/vouch/proposer-patterns?name=test_tag_{}&tag=lido",
+            app.address, id
+        ))
         .send()
         .await
         .expect("Failed to send request");
 
     let body: PaginatedResponse<ProposerPatternListItem> = response.json().await.unwrap();
     assert_eq!(body.data.len(), 2);
-    assert!(body.data.iter().all(|p| p.tags.contains(&"lido".to_string())));
+    assert!(
+        body.data
+            .iter()
+            .all(|p| p.tags.contains(&"lido".to_string()))
+    );
 
     // Filter by tag "decentralized"
     let response = app
         .client()
-        .get(&format!("{}/api/admin/vouch/proposer-patterns?name=test_tag_{}&tag=decentralized", app.address, id))
+        .get(format!(
+            "{}/api/admin/vouch/proposer-patterns?name=test_tag_{}&tag=decentralized",
+            app.address, id
+        ))
         .send()
         .await
         .expect("Failed to send request");
@@ -426,7 +459,7 @@ async fn test_filter_by_pattern() {
     let name2 = format!("test_pat_{}_{}", id, 2);
 
     app.client()
-        .post(&format!("{}/api/admin/vouch/proposer-patterns", app.address))
+        .post(format!("{}/api/admin/vouch/proposer-patterns", app.address))
         .json(&json!({
             "name": name1,
             "pattern": "^0x8[0-9a-f]{94}$"
@@ -436,7 +469,7 @@ async fn test_filter_by_pattern() {
         .unwrap();
 
     app.client()
-        .post(&format!("{}/api/admin/vouch/proposer-patterns", app.address))
+        .post(format!("{}/api/admin/vouch/proposer-patterns", app.address))
         .json(&json!({
             "name": name2,
             "pattern": "^0x9[0-9a-f]{94}$"
@@ -448,7 +481,10 @@ async fn test_filter_by_pattern() {
     // Filter by pattern substring
     let response = app
         .client()
-        .get(&format!("{}/api/admin/vouch/proposer-patterns?name=test_pat_{}&pattern=0x8", app.address, id))
+        .get(format!(
+            "{}/api/admin/vouch/proposer-patterns?name=test_pat_{}&pattern=0x8",
+            app.address, id
+        ))
         .send()
         .await
         .expect("Failed to send request");
@@ -468,10 +504,12 @@ async fn test_filter_by_reset_relays() {
     let id = TestApp::unique_id();
 
     // Create patterns with different reset_relays
-    let names: Vec<String> = (1..=4).map(|i| format!("test_reset_{}_{}", id, i)).collect();
+    let names: Vec<String> = (1..=4)
+        .map(|i| format!("test_reset_{}_{}", id, i))
+        .collect();
     for (i, name) in names.iter().enumerate() {
         app.client()
-            .post(&format!("{}/api/admin/vouch/proposer-patterns", app.address))
+            .post(format!("{}/api/admin/vouch/proposer-patterns", app.address))
             .json(&json!({
                 "name": name,
                 "pattern": format!("^0x{}[0-9a-f]{{94}}$", i),
@@ -485,7 +523,10 @@ async fn test_filter_by_reset_relays() {
     // Filter reset_relays = true
     let response = app
         .client()
-        .get(&format!("{}/api/admin/vouch/proposer-patterns?name=test_reset_{}&reset_relays=true", app.address, id))
+        .get(format!(
+            "{}/api/admin/vouch/proposer-patterns?name=test_reset_{}&reset_relays=true",
+            app.address, id
+        ))
         .send()
         .await
         .expect("Failed to send request");
@@ -509,7 +550,7 @@ async fn test_proposer_patterns_pagination() {
     let names: Vec<String> = (1..=5).map(|i| format!("test_page_{}_{}", id, i)).collect();
     for (i, name) in names.iter().enumerate() {
         app.client()
-            .post(&format!("{}/api/admin/vouch/proposer-patterns", app.address))
+            .post(format!("{}/api/admin/vouch/proposer-patterns", app.address))
             .json(&json!({
                 "name": name,
                 "pattern": format!("^0x{}[0-9a-f]{{94}}$", i)
@@ -522,7 +563,10 @@ async fn test_proposer_patterns_pagination() {
     // Test limit
     let response = app
         .client()
-        .get(&format!("{}/api/admin/vouch/proposer-patterns?name=test_page_{}&limit=2", app.address, id))
+        .get(format!(
+            "{}/api/admin/vouch/proposer-patterns?name=test_page_{}&limit=2",
+            app.address, id
+        ))
         .send()
         .await
         .expect("Failed to send request");
@@ -534,7 +578,10 @@ async fn test_proposer_patterns_pagination() {
     // Test offset
     let response = app
         .client()
-        .get(&format!("{}/api/admin/vouch/proposer-patterns?name=test_page_{}&limit=2&offset=3", app.address, id))
+        .get(format!(
+            "{}/api/admin/vouch/proposer-patterns?name=test_page_{}&limit=2&offset=3",
+            app.address, id
+        ))
         .send()
         .await
         .expect("Failed to send request");
@@ -562,7 +609,7 @@ async fn test_filter_patterns_by_relay_url() {
 
     // Create pattern with relay
     app.client()
-        .post(&format!("{}/api/admin/vouch/proposer-patterns", app.address))
+        .post(format!("{}/api/admin/vouch/proposer-patterns", app.address))
         .json(&json!({
             "name": name_with_relay,
             "pattern": "^0xa[0-9a-f]{94}$",
@@ -578,7 +625,7 @@ async fn test_filter_patterns_by_relay_url() {
 
     // Create pattern without relay
     app.client()
-        .post(&format!("{}/api/admin/vouch/proposer-patterns", app.address))
+        .post(format!("{}/api/admin/vouch/proposer-patterns", app.address))
         .json(&json!({
             "name": name_without_relay,
             "pattern": "^0xb[0-9a-f]{94}$"
@@ -590,7 +637,7 @@ async fn test_filter_patterns_by_relay_url() {
     // Filter by relay_url prefix
     let response = app
         .client()
-        .get(&format!(
+        .get(format!(
             "{}/api/admin/vouch/proposer-patterns?name=test_relay_url_{}&relay_url=https://flashbots",
             app.address, id
         ))
@@ -617,7 +664,7 @@ async fn test_filter_patterns_by_relay_min_value() {
 
     // Create pattern with relay that has min_value
     app.client()
-        .post(&format!("{}/api/admin/vouch/proposer-patterns", app.address))
+        .post(format!("{}/api/admin/vouch/proposer-patterns", app.address))
         .json(&json!({
             "name": name_with_min,
             "pattern": "^0xc[0-9a-f]{94}$",
@@ -634,7 +681,7 @@ async fn test_filter_patterns_by_relay_min_value() {
 
     // Create pattern with relay without min_value
     app.client()
-        .post(&format!("{}/api/admin/vouch/proposer-patterns", app.address))
+        .post(format!("{}/api/admin/vouch/proposer-patterns", app.address))
         .json(&json!({
             "name": name_without_min,
             "pattern": "^0xd[0-9a-f]{94}$",
@@ -651,7 +698,7 @@ async fn test_filter_patterns_by_relay_min_value() {
     // Filter by relay_min_value
     let response = app
         .client()
-        .get(&format!(
+        .get(format!(
             "{}/api/admin/vouch/proposer-patterns?name=test_relay_min_{}&relay_min_value=77000000000000000",
             app.address, id
         ))
@@ -678,7 +725,7 @@ async fn test_filter_patterns_by_relay_disabled() {
 
     // Create pattern with disabled relay
     app.client()
-        .post(&format!("{}/api/admin/vouch/proposer-patterns", app.address))
+        .post(format!("{}/api/admin/vouch/proposer-patterns", app.address))
         .json(&json!({
             "name": name_disabled,
             "pattern": "^0xe[0-9a-f]{94}$",
@@ -695,7 +742,7 @@ async fn test_filter_patterns_by_relay_disabled() {
 
     // Create pattern with enabled relay
     app.client()
-        .post(&format!("{}/api/admin/vouch/proposer-patterns", app.address))
+        .post(format!("{}/api/admin/vouch/proposer-patterns", app.address))
         .json(&json!({
             "name": name_enabled,
             "pattern": "^0xf[0-9a-f]{94}$",
@@ -713,7 +760,7 @@ async fn test_filter_patterns_by_relay_disabled() {
     // Filter by relay_disabled=true
     let response = app
         .client()
-        .get(&format!(
+        .get(format!(
             "{}/api/admin/vouch/proposer-patterns?name=test_relay_dis_{}&relay_disabled=true",
             app.address, id
         ))
@@ -729,7 +776,7 @@ async fn test_filter_patterns_by_relay_disabled() {
     // Filter by relay_disabled=false
     let response = app
         .client()
-        .get(&format!(
+        .get(format!(
             "{}/api/admin/vouch/proposer-patterns?name=test_relay_dis_{}&relay_disabled=false",
             app.address, id
         ))

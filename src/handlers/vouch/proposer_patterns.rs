@@ -1,4 +1,5 @@
 // handlers/vouch/proposer_patterns.rs - Proposer Pattern CRUD handlers
+use crate::AppState;
 use crate::audit::{AuditAction, AuditChanges, RequestContext, ResourceType};
 use crate::audit_log;
 use crate::errors::ApiError;
@@ -6,14 +7,14 @@ use crate::schema::{
     CreateProposerPatternRequest, PaginatedResponse, ProposerPatternListItem,
     ProposerPatternResponse, ProposerRelayConfig, UpdateProposerPatternRequest,
 };
-use crate::AppState;
 use axum::{
+    Json,
     extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
-    Json,
 };
 use serde::Deserialize;
+use sqlx::{Postgres, QueryBuilder};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{info, instrument};
@@ -44,6 +45,51 @@ fn default_limit() -> i64 {
     100
 }
 
+/// Appends the WHERE clause for `filters`; every value is a bind parameter.
+fn push_filters(qb: &mut QueryBuilder<Postgres>, filters: &ProposerPatternFilters) {
+    qb.push(" WHERE TRUE");
+    if let Some(ref name) = filters.name {
+        qb.push(" AND p.name LIKE ").push_bind(format!("{name}%"));
+    }
+    if let Some(ref pattern) = filters.pattern {
+        qb.push(" AND p.pattern LIKE ")
+            .push_bind(format!("%{pattern}%"));
+    }
+    if let Some(ref tag) = filters.tag {
+        qb.push(" AND ")
+            .push_bind(tag.clone())
+            .push(" = ANY(p.tags)");
+    }
+    if let Some(ref fr) = filters.fee_recipient {
+        qb.push(" AND p.fee_recipient = ").push_bind(fr.clone());
+    }
+    if let Some(ref gl) = filters.gas_limit {
+        qb.push(" AND p.gas_limit = ").push_bind(gl.clone());
+    }
+    if let Some(ref mv) = filters.min_value {
+        qb.push(" AND p.min_value = ").push_bind(mv.clone());
+    }
+    if let Some(rr) = filters.reset_relays {
+        qb.push(" AND p.reset_relays = ").push_bind(rr);
+    }
+    // Relay filters using EXISTS subquery
+    if let Some(ref relay_url) = filters.relay_url {
+        qb.push(" AND EXISTS (SELECT 1 FROM vouch_proposer_pattern_relays r WHERE r.pattern_name = p.name AND r.url LIKE ")
+            .push_bind(format!("{relay_url}%"))
+            .push(")");
+    }
+    if let Some(ref relay_min_value) = filters.relay_min_value {
+        qb.push(" AND EXISTS (SELECT 1 FROM vouch_proposer_pattern_relays r WHERE r.pattern_name = p.name AND r.min_value = ")
+            .push_bind(relay_min_value.clone())
+            .push(")");
+    }
+    if let Some(relay_disabled) = filters.relay_disabled {
+        qb.push(" AND EXISTS (SELECT 1 FROM vouch_proposer_pattern_relays r WHERE r.pattern_name = p.name AND r.disabled = ")
+            .push_bind(relay_disabled)
+            .push(")");
+    }
+}
+
 #[utoipa::path(
     get,
     path = "/api/admin/vouch/proposer-patterns",
@@ -61,75 +107,26 @@ pub async fn list_proposer_patterns(
 ) -> Result<Json<PaginatedResponse<ProposerPatternListItem>>, ApiError> {
     info!("Listing proposer patterns with filters: {:?}", filters);
 
-    let mut conditions = Vec::new();
-
-    if let Some(ref name) = filters.name {
-        conditions.push(format!("p.name LIKE '{}%'", name.replace('\'', "''")));
-    }
-    if let Some(ref pattern) = filters.pattern {
-        conditions.push(format!("p.pattern LIKE '%{}%'", pattern.replace('\'', "''")));
-    }
-    if let Some(ref tag) = filters.tag {
-        conditions.push(format!("'{}' = ANY(p.tags)", tag.replace('\'', "''")));
-    }
-    if let Some(ref fr) = filters.fee_recipient {
-        conditions.push(format!("p.fee_recipient = '{}'", fr.replace('\'', "''")));
-    }
-    if let Some(ref gl) = filters.gas_limit {
-        conditions.push(format!("p.gas_limit = '{}'", gl.replace('\'', "''")));
-    }
-    if let Some(ref mv) = filters.min_value {
-        conditions.push(format!("p.min_value = '{}'", mv.replace('\'', "''")));
-    }
-    if let Some(rr) = filters.reset_relays {
-        conditions.push(format!(
-            "p.reset_relays = {}",
-            if rr { "true" } else { "false" }
-        ));
-    }
-    // Relay filters using EXISTS subquery
-    if let Some(ref relay_url) = filters.relay_url {
-        conditions.push(format!(
-            "EXISTS (SELECT 1 FROM vouch_proposer_pattern_relays r WHERE r.pattern_name = p.name AND r.url LIKE '{}%')",
-            relay_url.replace('\'', "''")
-        ));
-    }
-    if let Some(ref relay_min_value) = filters.relay_min_value {
-        conditions.push(format!(
-            "EXISTS (SELECT 1 FROM vouch_proposer_pattern_relays r WHERE r.pattern_name = p.name AND r.min_value = '{}')",
-            relay_min_value.replace('\'', "''")
-        ));
-    }
-    if let Some(relay_disabled) = filters.relay_disabled {
-        conditions.push(format!(
-            "EXISTS (SELECT 1 FROM vouch_proposer_pattern_relays r WHERE r.pattern_name = p.name AND r.disabled = {})",
-            if relay_disabled { "true" } else { "false" }
-        ));
-    }
-
-    let where_clause = if conditions.is_empty() {
-        String::new()
-    } else {
-        format!("WHERE {}", conditions.join(" AND "))
-    };
-
-    let count_sql = format!(
-        "SELECT COUNT(*) as count FROM vouch_proposer_patterns p {}",
-        where_clause
-    );
-    let total: i64 = sqlx::query_scalar(&count_sql)
+    let mut count_query = QueryBuilder::new("SELECT COUNT(*) FROM vouch_proposer_patterns p");
+    push_filters(&mut count_query, &filters);
+    let total: i64 = count_query
+        .build_query_scalar()
         .fetch_one(&state.pool)
         .await?;
 
-    let data_sql = format!(
+    let mut data_query = QueryBuilder::new(
         "SELECT p.name, p.pattern, p.tags, p.fee_recipient, p.gas_limit, p.min_value, p.reset_relays, p.created_at, p.updated_at
-         FROM vouch_proposer_patterns p {}
-         ORDER BY p.name ASC
-         LIMIT {} OFFSET {}",
-        where_clause, filters.limit, filters.offset
+         FROM vouch_proposer_patterns p",
     );
+    push_filters(&mut data_query, &filters);
+    data_query
+        .push(" ORDER BY p.name ASC LIMIT ")
+        .push_bind(filters.limit)
+        .push(" OFFSET ")
+        .push_bind(filters.offset);
 
-    let patterns = sqlx::query_as::<_, crate::models::VouchProposerPattern>(&data_sql)
+    let patterns = data_query
+        .build_query_as::<crate::models::VouchProposerPattern>()
         .fetch_all(&state.pool)
         .await?;
 
@@ -286,7 +283,13 @@ pub async fn create_proposer_pattern(
             relays_count: req.relays.as_ref().map(|r| r.len()),
             ..Default::default()
         };
-        audit_log!(ctx, AuditAction::Create, ResourceType::VouchProposerPattern, &req.name, changes);
+        audit_log!(
+            ctx,
+            AuditAction::Create,
+            ResourceType::VouchProposerPattern,
+            &req.name,
+            changes
+        );
     }
 
     // Fetch created pattern
@@ -371,62 +374,34 @@ pub async fn update_proposer_pattern(
         )));
     }
 
-    // Build update query dynamically
-    let mut set_clauses = Vec::new();
-    let mut param_index = 2;
+    // Omitted fields keep their current value
+    let has_updates = req.pattern.is_some()
+        || req.tags.is_some()
+        || req.fee_recipient.is_some()
+        || req.gas_limit.is_some()
+        || req.min_value.is_some()
+        || req.reset_relays.is_some();
 
-    if req.pattern.is_some() {
-        set_clauses.push(format!("pattern = ${}", param_index));
-        param_index += 1;
-    }
-    if req.tags.is_some() {
-        set_clauses.push(format!("tags = ${}", param_index));
-        param_index += 1;
-    }
-    if req.fee_recipient.is_some() {
-        set_clauses.push(format!("fee_recipient = ${}", param_index));
-        param_index += 1;
-    }
-    if req.gas_limit.is_some() {
-        set_clauses.push(format!("gas_limit = ${}", param_index));
-        param_index += 1;
-    }
-    if req.min_value.is_some() {
-        set_clauses.push(format!("min_value = ${}", param_index));
-        param_index += 1;
-    }
-    if req.reset_relays.is_some() {
-        set_clauses.push(format!("reset_relays = ${}", param_index));
-    }
-
-    if !set_clauses.is_empty() {
-        let update_sql = format!(
-            "UPDATE vouch_proposer_patterns SET {} WHERE name = $1",
-            set_clauses.join(", ")
-        );
-
-        let mut query = sqlx::query(&update_sql).bind(&name);
-
-        if let Some(ref p) = req.pattern {
-            query = query.bind(p);
-        }
-        if let Some(ref t) = req.tags {
-            query = query.bind(t);
-        }
-        if let Some(ref fr) = req.fee_recipient {
-            query = query.bind(fr);
-        }
-        if let Some(ref gl) = req.gas_limit {
-            query = query.bind(gl);
-        }
-        if let Some(ref mv) = req.min_value {
-            query = query.bind(mv);
-        }
-        if let Some(rr) = req.reset_relays {
-            query = query.bind(rr);
-        }
-
-        query.execute(&mut *tx).await?;
+    if has_updates {
+        sqlx::query(
+            "UPDATE vouch_proposer_patterns SET
+                pattern = COALESCE($2, pattern),
+                tags = COALESCE($3, tags),
+                fee_recipient = COALESCE($4, fee_recipient),
+                gas_limit = COALESCE($5, gas_limit),
+                min_value = COALESCE($6, min_value),
+                reset_relays = COALESCE($7, reset_relays)
+             WHERE name = $1",
+        )
+        .bind(&name)
+        .bind(&req.pattern)
+        .bind(&req.tags)
+        .bind(&req.fee_recipient)
+        .bind(&req.gas_limit)
+        .bind(&req.min_value)
+        .bind(req.reset_relays)
+        .execute(&mut *tx)
+        .await?;
     }
 
     // Handle relays if provided
@@ -468,7 +443,13 @@ pub async fn update_proposer_pattern(
             relays_count: req.relays.as_ref().map(|r| r.len()),
             ..Default::default()
         };
-        audit_log!(ctx, AuditAction::Update, ResourceType::VouchProposerPattern, &name, changes);
+        audit_log!(
+            ctx,
+            AuditAction::Update,
+            ResourceType::VouchProposerPattern,
+            &name,
+            changes
+        );
     }
 
     // Fetch updated pattern
@@ -546,7 +527,12 @@ pub async fn delete_proposer_pattern(
 
     // Audit log
     if state.config.audit_enabled {
-        audit_log!(ctx, AuditAction::Delete, ResourceType::VouchProposerPattern, &name);
+        audit_log!(
+            ctx,
+            AuditAction::Delete,
+            ResourceType::VouchProposerPattern,
+            &name
+        );
     }
 
     Ok(StatusCode::NO_CONTENT)

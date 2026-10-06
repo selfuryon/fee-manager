@@ -1,0 +1,14 @@
+# Keep the build context to what the Containerfile copies: no .git history,
+# no target/, no local config or env files.
+.git
+.gitignore
+.github
+.claude
+target
+result
+.devenv*
+.direnv
+*.md
+.env*
+config.yaml
+scripts

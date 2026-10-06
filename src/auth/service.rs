@@ -1,6 +1,6 @@
 // Token service: generation, validation, and CRUD operations
 
-use rand::Rng;
+use rand::RngExt;
 use sha2::{Digest, Sha256};
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -77,9 +77,12 @@ pub async fn get_token_by_hash(pool: &PgPool, token: &str) -> Result<Option<Auth
 
 /// Update last_used_at for a token
 pub async fn update_last_used(pool: &PgPool, id: Uuid) -> Result<(), ApiError> {
-    sqlx::query!("UPDATE auth_tokens SET last_used_at = NOW() WHERE id = $1", id)
-        .execute(pool)
-        .await?;
+    sqlx::query!(
+        "UPDATE auth_tokens SET last_used_at = NOW() WHERE id = $1",
+        id
+    )
+    .execute(pool)
+    .await?;
     Ok(())
 }
 
@@ -163,7 +166,8 @@ pub async fn ensure_default_token(pool: &PgPool) -> Result<Option<String>, ApiEr
     }
 
     // Create default token
-    let (_, plaintext) = create_token(pool, "default", Some("Auto-generated initial token")).await?;
+    let (_, plaintext) =
+        create_token(pool, "default", Some("Auto-generated initial token")).await?;
 
     Ok(Some(plaintext))
 }

@@ -15,7 +15,7 @@ async fn test_health_endpoint() {
 
     let response = app
         .client()
-        .get(&format!("{}/health", app.address))
+        .get(format!("{}/health", app.address))
         .send()
         .await
         .expect("Failed to send request");
@@ -32,7 +32,7 @@ async fn test_ready_endpoint() {
 
     let response = app
         .client()
-        .get(&format!("{}/ready", app.address))
+        .get(format!("{}/ready", app.address))
         .send()
         .await
         .expect("Failed to send request");

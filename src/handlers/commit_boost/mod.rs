@@ -1,6 +1,9 @@
 // handlers/commit_boost/mod.rs - Commit-Boost routes
 use crate::AppState;
-use axum::{routing::{get, post}, Router};
+use axum::{
+    Router,
+    routing::{get, post},
+};
 use std::sync::Arc;
 
 pub mod mux;
@@ -13,7 +16,10 @@ pub fn public_routes() -> Router<Arc<AppState>> {
 /// Admin routes for Commit-Boost (authentication required)
 pub fn admin_routes() -> Router<Arc<AppState>> {
     Router::new()
-        .route("/mux", get(mux::list_mux_configs).post(mux::create_mux_config))
+        .route(
+            "/mux",
+            get(mux::list_mux_configs).post(mux::create_mux_config),
+        )
         .route(
             "/mux/{name}",
             get(mux::get_mux_config)

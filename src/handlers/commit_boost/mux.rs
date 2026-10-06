@@ -1,4 +1,5 @@
 // handlers/commit_boost/mux.rs - Mux config CRUD handlers
+use crate::AppState;
 use crate::addresses::BlsPubkey;
 use crate::audit::{AuditAction, AuditChanges, RequestContext, ResourceType};
 use crate::audit_log;
@@ -7,12 +8,11 @@ use crate::schema::{
     CreateMuxConfigRequest, MuxConfigListItem, MuxConfigResponse, MuxKeysRequest, MuxKeysResponse,
     PaginatedResponse, UpdateMuxConfigRequest,
 };
-use crate::AppState;
 use axum::{
+    Json,
     extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
-    Json,
 };
 use serde::Deserialize;
 use std::sync::Arc;
@@ -117,12 +117,11 @@ pub async fn list_mux_configs(
 
     let mut data = Vec::new();
     for config in configs {
-        let key_count: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM commit_boost_mux_keys WHERE mux_name = $1",
-        )
-        .bind(&config.name)
-        .fetch_one(&state.pool)
-        .await?;
+        let key_count: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM commit_boost_mux_keys WHERE mux_name = $1")
+                .bind(&config.name)
+                .fetch_one(&state.pool)
+                .await?;
 
         data.push(MuxConfigListItem {
             name: config.name,
@@ -240,7 +239,13 @@ pub async fn create_mux_config(
             key_count: Some(req.keys.len() as i64),
             ..Default::default()
         };
-        audit_log!(ctx, AuditAction::Create, ResourceType::CommitBoostMux, &req.name, changes);
+        audit_log!(
+            ctx,
+            AuditAction::Create,
+            ResourceType::CommitBoostMux,
+            &req.name,
+            changes
+        );
     }
 
     let config = sqlx::query_as::<_, crate::models::CommitBoostMuxConfig>(
@@ -328,7 +333,13 @@ pub async fn update_mux_config(
             key_count: Some(req.keys.len() as i64),
             ..Default::default()
         };
-        audit_log!(ctx, AuditAction::Update, ResourceType::CommitBoostMux, &name, changes);
+        audit_log!(
+            ctx,
+            AuditAction::Update,
+            ResourceType::CommitBoostMux,
+            &name,
+            changes
+        );
     }
 
     let config = sqlx::query_as::<_, crate::models::CommitBoostMuxConfig>(
@@ -381,7 +392,12 @@ pub async fn delete_mux_config(
 
     // Audit log
     if state.config.audit_enabled {
-        audit_log!(ctx, AuditAction::Delete, ResourceType::CommitBoostMux, &name);
+        audit_log!(
+            ctx,
+            AuditAction::Delete,
+            ResourceType::CommitBoostMux,
+            &name
+        );
     }
 
     Ok(StatusCode::NO_CONTENT)
@@ -461,7 +477,13 @@ pub async fn add_mux_keys(
             key_count: Some(added),
             ..Default::default()
         };
-        audit_log!(ctx, AuditAction::AddKeys, ResourceType::CommitBoostMux, &name, changes);
+        audit_log!(
+            ctx,
+            AuditAction::AddKeys,
+            ResourceType::CommitBoostMux,
+            &name,
+            changes
+        );
     }
 
     Ok(Json(MuxKeysResponse {
@@ -541,7 +563,13 @@ pub async fn remove_mux_keys(
             key_count: Some(removed),
             ..Default::default()
         };
-        audit_log!(ctx, AuditAction::RemoveKeys, ResourceType::CommitBoostMux, &name, changes);
+        audit_log!(
+            ctx,
+            AuditAction::RemoveKeys,
+            ResourceType::CommitBoostMux,
+            &name,
+            changes
+        );
     }
 
     Ok(Json(MuxKeysResponse {

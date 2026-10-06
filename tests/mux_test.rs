@@ -33,11 +33,10 @@ struct MuxKeysResponse {
 
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
-struct PaginatedResponse<T> {
-    data: Vec<T>,
-    total: i64,
-    limit: i64,
-    offset: i64,
+struct ListResponse<T> {
+    items: Vec<T>,
+    #[allow(dead_code)]
+    next_cursor: Option<String>,
 }
 
 /// Helper to create unique mux name
@@ -140,7 +139,9 @@ async fn test_create_mux_config_duplicate() {
         .await
         .expect("Failed to send request");
 
-    assert_eq!(response.status(), 400);
+    assert_eq!(response.status(), 409);
+    let body: serde_json::Value = response.json().await.unwrap();
+    assert_eq!(body["error"]["code"], "CONFLICT");
 
     delete_mux(app, &name).await;
 }
@@ -506,10 +507,10 @@ async fn test_list_mux_configs() {
 
     assert_eq!(response.status(), 200);
 
-    let body: PaginatedResponse<MuxConfigListItem> =
+    let body: ListResponse<MuxConfigListItem> =
         response.json().await.expect("Failed to parse JSON");
     let test_configs: Vec<_> = body
-        .data
+        .items
         .iter()
         .filter(|c| c.name.starts_with(&format!("test_mux_list_{}", id)))
         .collect();
@@ -541,20 +542,19 @@ async fn test_mux_pagination() {
             .expect("Failed to create config");
     }
 
-    // Test limit
-    let response = app
-        .client()
-        .get(format!(
-            "{}/api/admin/commit-boost/mux?limit=2",
-            app.address
-        ))
-        .send()
-        .await
-        .expect("Failed to send request");
-
-    let body: PaginatedResponse<MuxConfigListItem> = response.json().await.unwrap();
-    assert_eq!(body.data.len(), 2);
-    assert_eq!(body.limit, 2);
+    // The mux list has no filters, so other configs may be present: walk it
+    // and check ours appear once each, in name order
+    let (pages, keys) = app
+        .walk_pages(
+            &format!("{}/api/admin/commit-boost/mux?limit=2", app.address),
+            "name",
+        )
+        .await;
+    assert!(pages.iter().all(|&n| n <= 2));
+    let ours: Vec<&String> = keys.iter().filter(|k| names.contains(k)).collect();
+    let mut expected: Vec<&String> = names.iter().collect();
+    expected.sort();
+    assert_eq!(ours, expected);
 
     // Cleanup
     for name in &names {

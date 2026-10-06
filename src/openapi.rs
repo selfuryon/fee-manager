@@ -1,4 +1,5 @@
 use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
+use utoipa::openapi::{ContentBuilder, Ref, RefOr, ResponseBuilder};
 use utoipa::{Modify, OpenApi};
 
 #[derive(OpenApi)]
@@ -13,7 +14,7 @@ use utoipa::{Modify, OpenApi};
             ("server_url" = (default = "http://localhost:3000", description = "API Server URL"))
         )),
     ),
-    modifiers(&SecurityAddon),
+    modifiers(&SecurityAddon, &ErrorResponsesAddon),
     paths(
         // Health
         crate::handlers::get_ready,
@@ -60,10 +61,10 @@ use utoipa::{Modify, OpenApi};
             // Common
             crate::schema::RelayConfig,
             crate::schema::ProposerRelayConfig,
-            crate::schema::PaginatedResponse<crate::schema::ProposerListItem>,
-            crate::schema::PaginatedResponse<crate::schema::DefaultConfigListItem>,
-            crate::schema::PaginatedResponse<crate::schema::ProposerPatternListItem>,
-            crate::schema::PaginatedResponse<crate::schema::MuxConfigListItem>,
+            crate::pagination::ListResponse<crate::schema::ProposerListItem>,
+            crate::pagination::ListResponse<crate::schema::DefaultConfigListItem>,
+            crate::pagination::ListResponse<crate::schema::ProposerPatternListItem>,
+            crate::pagination::ListResponse<crate::schema::MuxConfigListItem>,
             // Vouch - Proposers
             crate::schema::ProposerResponse,
             crate::schema::ProposerListItem,
@@ -123,6 +124,72 @@ impl Modify for SecurityAddon {
                         .build(),
                 ),
             );
+        }
+    }
+}
+
+/// Documents the shared error responses on every operation, so the ~25
+/// handler annotations do not each have to repeat them. A response an
+/// operation already declares keeps its description and gains the
+/// `ErrorResponse` body if it had none.
+struct ErrorResponsesAddon;
+
+impl Modify for ErrorResponsesAddon {
+    fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+        let body = || {
+            ContentBuilder::new()
+                .schema(Some(Ref::from_schema_name("ErrorResponse")))
+                .build()
+        };
+        for (path, item) in openapi.paths.paths.iter_mut() {
+            let admin = path.starts_with("/api/admin/");
+            let has_path_param = path.contains('{');
+            // Probes take no input and do not fail
+            if path == "/health" || path == "/ready" {
+                continue;
+            }
+            let operations = [
+                ("get", item.get.as_mut()),
+                ("put", item.put.as_mut()),
+                ("post", item.post.as_mut()),
+                ("delete", item.delete.as_mut()),
+                ("patch", item.patch.as_mut()),
+            ];
+            for (method, operation) in operations {
+                let Some(operation) = operation else { continue };
+                let mut statuses = vec![("400", "Invalid input"), ("500", "Internal error")];
+                if admin {
+                    statuses.push(("401", "Missing or invalid token"));
+                }
+                // PUT on a proposer creates it when missing
+                let upsert = method == "put" && path.starts_with("/api/admin/vouch/proposers/");
+                if has_path_param && !upsert {
+                    statuses.push(("404", "Not found"));
+                }
+                // Named resources; token names are not unique
+                if method == "post" && !has_path_param && !path.starts_with("/api/admin/tokens") {
+                    statuses.push(("409", "Already exists"));
+                }
+                if path.starts_with("/vouch/") && method == "post" {
+                    statuses.push(("413", "Request body too large"));
+                }
+                for (status, description) in statuses {
+                    let response = operation
+                        .responses
+                        .responses
+                        .entry(status.to_string())
+                        .or_insert_with(|| {
+                            RefOr::T(ResponseBuilder::new().description(description).build())
+                        });
+                    if let RefOr::T(response) = response
+                        && response.content.is_empty()
+                    {
+                        response
+                            .content
+                            .insert("application/json".to_string(), RefOr::T(body()));
+                    }
+                }
+            }
         }
     }
 }

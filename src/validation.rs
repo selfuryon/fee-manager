@@ -143,7 +143,7 @@ impl CreateProposerPatternRequest {
 
 impl UpdateProposerPatternRequest {
     pub fn validate(&self) -> Result<(), ApiError> {
-        check("pattern", self.pattern.as_deref(), pattern)?;
+        check("pattern", Some(&self.pattern), pattern)?;
         check("gas_limit", self.gas_limit.as_deref(), gas_limit)?;
         check("min_value", self.min_value.as_deref(), min_value)?;
         relays(self.relays.as_ref())
@@ -225,7 +225,7 @@ mod tests {
             fee_recipient: None,
             gas_limit: None,
             min_value: None,
-            active: None,
+            active: true,
             relays: Some(HashMap::from([(
                 "https://relay.example.invalid/".to_string(),
                 relay(None, Some("cheap")),
@@ -244,7 +244,7 @@ mod tests {
             fee_recipient: None,
             gas_limit: None,
             min_value: None,
-            active: Some(false),
+            active: false,
             relays: None,
         };
         assert!(req.validate().is_ok());
@@ -256,7 +256,7 @@ mod tests {
             fee_recipient: None,
             gas_limit: Some("lots".into()),
             min_value: None,
-            active: None,
+            active: true,
             relays: Some(HashMap::from([(
                 "https://relay.example.invalid/".to_string(),
                 relay(Some("30000000"), None),

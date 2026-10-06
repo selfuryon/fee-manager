@@ -2,15 +2,13 @@
 use crate::AppState;
 use crate::addresses::BlsPubkey;
 use crate::errors::ApiError;
+use crate::extract::{AppJson, AppPath, AppQuery};
 use crate::models::{
     VouchDefaultConfig, VouchDefaultRelay, VouchProposer, VouchProposerPattern,
     VouchProposerPatternRelay, VouchProposerRelay,
 };
 use crate::schema::{ExecutionConfigResponse, ProposerEntry, RelayConfig};
-use axum::{
-    Json,
-    extract::{Path, Query, State},
-};
+use axum::{Json, extract::State};
 use serde::Deserialize;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
@@ -44,9 +42,9 @@ fn non_empty(relays: Option<RelayMap>) -> Option<RelayMap> {
 #[instrument(skip(state, keys), fields(keys = keys.len()))]
 pub async fn get_execution_config(
     State(state): State<Arc<AppState>>,
-    Path(config_name): Path<String>,
-    Query(query): Query<ExecutionConfigQuery>,
-    Json(keys): Json<Vec<BlsPubkey>>,
+    AppPath(config_name): AppPath<String>,
+    AppQuery(query): AppQuery<ExecutionConfigQuery>,
+    AppJson(keys): AppJson<Vec<BlsPubkey>>,
 ) -> Result<Json<ExecutionConfigResponse>, ApiError> {
     info!(
         "Getting execution config: {} with tags: {:?}, keys: {}",

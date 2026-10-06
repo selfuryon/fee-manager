@@ -1,6 +1,7 @@
 // handlers/mod.rs - Main router and health endpoints
 use crate::AppState;
 use crate::auth;
+use crate::errors::ApiError;
 use crate::openapi;
 use axum::{
     Json, Router, body::Body, http::Request, middleware, response::IntoResponse, routing::get,
@@ -93,6 +94,9 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .merge(
             SwaggerUi::new("/swagger-ui").url("/api-doc/openapi.json", openapi::ApiDoc::openapi()),
         )
+        // JSON error bodies for unknown routes and methods too
+        .fallback(|| async { ApiError::NotFound("Route not found".to_string()) })
+        .method_not_allowed_fallback(|| async { ApiError::MethodNotAllowed })
         // Add request ID middleware
         .layer(middleware::from_fn(inject_request_id))
         .layer(SetRequestIdLayer::x_request_id(MakeRequestUuid))

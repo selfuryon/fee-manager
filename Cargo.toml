@@ -12,7 +12,7 @@ path = "src/main.rs"
 name = "fee-manager"
 
 [dependencies]
-axum = "0.8"
+axum = { version = "0.8", features = ["macros"] }
 tower-http = { version = "0.7", features = ["request-id", "util"] }
 utoipa = { version = "6", features = ["axum_extras", "chrono", "uuid"] }
 utoipa-swagger-ui = { version = "10", features = ["axum"] }

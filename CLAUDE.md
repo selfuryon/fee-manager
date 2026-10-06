@@ -145,3 +145,7 @@ When adding new routes:
 3. **Run checks**:
    - `cargo test` - all tests must pass
    - `cargo sqlx prepare -- --all-targets` - update offline query cache if new SQL queries added; CI and the clippy hook compile with `SQLX_OFFLINE=true`, so a missing entry fails there
+
+## Spec-Driven Changes (OpenSpec)
+
+Non-trivial behaviour changes go through OpenSpec: `/opsx:propose` drafts `openspec/changes/<name>/` (proposal, spec delta, design, tasks), `/opsx:apply` implements it, `/opsx:archive` merges the delta into `openspec/specs/`. Project context and per-artifact rules live in `openspec/config.yaml`. The `.claude/commands/opsx/` and `.claude/skills/openspec-*` files are generated — refresh them with `openspec update`, don't edit by hand.

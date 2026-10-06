@@ -4,12 +4,14 @@ use crate::auth;
 use crate::errors::ApiError;
 use crate::openapi;
 use axum::{
-    Json, Router, body::Body, http::Request, middleware, response::IntoResponse, routing::get,
+    Json, Router, body::Body, extract::State, http::Request, middleware, response::IntoResponse,
+    routing::get,
 };
 use serde::Serialize;
 use std::sync::Arc;
+use std::time::Duration;
 use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
-use tracing::instrument;
+use tracing::{instrument, warn};
 use utoipa::OpenApi;
 use utoipa::ToSchema;
 use utoipa_swagger_ui::SwaggerUi;
@@ -27,16 +29,35 @@ pub struct HealthResponse {
     get,
     path = "/ready",
     responses(
-        (status = 200, description = "Service ready", body = HealthResponse)
+        (status = 200, description = "Service ready", body = HealthResponse),
+        (status = 503, description = "Database unavailable", body = crate::errors::ErrorResponse)
     ),
     tag = "Health"
 )]
-#[instrument]
-pub async fn get_ready() -> impl IntoResponse {
-    Json(HealthResponse {
-        status: "ready".to_string(),
-    })
+#[instrument(skip(state))]
+pub async fn get_ready(
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<HealthResponse>, ApiError> {
+    // Goes through the shared pool on purpose: an exhausted pool cannot serve
+    // requests either. The timeout keeps the probe well below the pool's 30s
+    // acquire timeout.
+    match tokio::time::timeout(READY_TIMEOUT, sqlx::query("SELECT 1").execute(&state.pool)).await {
+        Ok(Ok(_)) => Ok(Json(HealthResponse {
+            status: "ready".to_string(),
+        })),
+        Ok(Err(e)) => {
+            warn!("Readiness check failed: {e}");
+            Err(ApiError::ServiceUnavailable)
+        }
+        Err(_) => {
+            warn!("Readiness check timed out after {READY_TIMEOUT:?}");
+            Err(ApiError::ServiceUnavailable)
+        }
+    }
 }
+
+/// How long `/ready` waits for the database
+const READY_TIMEOUT: Duration = Duration::from_secs(2);
 
 #[utoipa::path(
     get,

@@ -104,6 +104,36 @@ docker build -f Containerfile -t fee-manager .
 docker run -p 3000:3000 -v ./config.yaml:/app/config.yaml fee-manager
 ```
 
+### Running in Kubernetes
+
+| Endpoint | Probe | Meaning |
+|----------|-------|---------|
+| `GET /health` | liveness | the process answers HTTP; never touches the database, so a database outage does not restart pods |
+| `GET /ready` | readiness | the database answers `SELECT 1` within 2 s; otherwise `503 SERVICE_UNAVAILABLE` and the pod leaves the Service until it recovers |
+
+On `SIGTERM` the service stops accepting connections, lets in-flight requests finish, closes its database pool and exits `0`. Endpoint removal and `SIGTERM` happen concurrently in Kubernetes, so give it a moment before the signal:
+
+```yaml
+spec:
+  terminationGracePeriodSeconds: 30
+  containers:
+    - name: fee-manager
+      livenessProbe:
+        httpGet: { path: /health, port: 3000 }
+        periodSeconds: 10
+        failureThreshold: 3
+      readinessProbe:
+        httpGet: { path: /ready, port: 3000 }
+        periodSeconds: 5
+        timeoutSeconds: 3
+        failureThreshold: 2
+      lifecycle:
+        preStop:
+          sleep: { seconds: 5 }
+```
+
+The image is distroless (no shell), so use the native `sleep` handler (Kubernetes 1.30+) rather than `exec: ["sleep", "5"]`.
+
 ## Authentication
 
 Admin endpoints (`/api/admin/*`) require Bearer token authentication:

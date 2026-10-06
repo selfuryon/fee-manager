@@ -57,7 +57,8 @@ The service SHALL use these statuses and codes for non-input errors:
 - `404` `NOT_FOUND` when the addressed resource or route does not exist;
 - `409` `CONFLICT` when a create would duplicate an existing resource's name;
 - `413` `PAYLOAD_TOO_LARGE` when a request body exceeds the endpoint's size limit;
-- `500` `INTERNAL_ERROR` for unexpected failures.
+- `500` `INTERNAL_ERROR` for unexpected failures;
+- `503` `SERVICE_UNAVAILABLE` when the service cannot currently serve requests because a dependency is unavailable.
 
 #### Scenario: Missing token
 - **WHEN** a client calls `GET /api/admin/vouch/proposers` without an `Authorization` header
@@ -70,3 +71,7 @@ The service SHALL use these statuses and codes for non-input errors:
 #### Scenario: Missing resource
 - **WHEN** a client requests `GET /api/admin/vouch/configs/default/unknown-example`
 - **THEN** the response is `404` with `error.code` `NOT_FOUND`
+
+#### Scenario: Dependency unavailable
+- **WHEN** the database is unreachable and a client requests `GET /ready`
+- **THEN** the response is `503` with `error.code` `SERVICE_UNAVAILABLE`

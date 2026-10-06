@@ -1,0 +1,50 @@
+schema: spec-driven
+
+# Shown to an AI agent whenever it drafts a proposal, a spec or a task list
+# here. It is the short version of CLAUDE.md - enough that a change proposed
+# cold does not break the two consumers this service exists for.
+context: |
+  Fee Manager: a small Rust service (Axum, PostgreSQL via SQLx) that stores
+  validator configuration centrally and serves it to two consumers:
+  - Vouch, which POSTs a plain JSON array of validator public keys to
+    /vouch/v2/execution-config/{config}?tags=... and gets back an execution
+    config v2 (https://github.com/attestantio/vouch/blob/master/docs/executionconfig.md)
+    built from a named default config, the configs of known requested keys,
+    and the regex pattern configs whose tags match (OR logic).
+  - Commit-Boost, which GETs /commit-boost/v1/mux/{name} for a key list.
+  Everything under /api/admin/* is the bearer-token management API.
+
+  The public endpoints are a wire contract with software we do not control:
+  their paths, request shape and response shape change only on purpose, and
+  a proposal that touches them says so. openapi.json is generated from the
+  utoipa annotations and a test fails when it drifts, so an API change
+  includes regenerating it.
+
+  Keep it simple: a small microservice, no speculative abstraction. SQL is
+  checked at compile time against the committed .sqlx cache; dynamic SQL
+  goes through QueryBuilder with bind parameters, never string formatting.
+  Conventional Commits.
+
+# Per-artifact rules
+rules:
+  proposal:
+    - >-
+      State whether the change affects what Vouch or Commit-Boost receive,
+      even when the answer is "no" - that sentence is the check that
+      somebody asked.
+    - >-
+      Say whether a database migration is needed; migrations are applied
+      automatically on startup and cannot be skipped.
+  specs:
+    - >-
+      Requirements describe behaviour observable over HTTP - status codes,
+      response bodies, what a consumer receives - not internal structure.
+    - >-
+      Illustrate with obviously invented placeholder keys and addresses,
+      never real validator keys or fee recipients.
+  tasks:
+    - >-
+      End with the checks CI runs: cargo fmt, cargo clippy -D warnings,
+      cargo test, plus `cargo sqlx prepare -- --all-targets` when SQL
+      changed and `UPDATE_OPENAPI=1 cargo test --test openapi_test` when
+      the API changed.

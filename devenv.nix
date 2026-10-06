@@ -8,6 +8,8 @@
       pinact
       zizmor
       actionlint
+      # Spec-driven change proposals - see openspec/.
+      openspec
       ;
   };
   env.DATABASE_URL = "postgres://feemanager:feemanager@localhost/feemanager";

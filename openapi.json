@@ -1,0 +1,2809 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Fee Manager API",
+    "description": "REST API for managing validator configurations for Vouch and Commit-Boost",
+    "license": {
+      "name": ""
+    },
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "{server_url}",
+      "variables": {
+        "server_url": {
+          "default": "http://localhost:3000",
+          "description": "API Server URL"
+        }
+      }
+    }
+  ],
+  "paths": {
+    "/api/admin/commit-boost/mux": {
+      "get": {
+        "tags": [
+          "Commit-Boost - Mux"
+        ],
+        "operationId": "list_mux_configs",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of mux configs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse_MuxConfigListItem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Commit-Boost - Mux"
+        ],
+        "operationId": "create_mux_config",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMuxConfigRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Mux config created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MuxConfigListItem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Mux config already exists"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/admin/commit-boost/mux/{name}": {
+      "get": {
+        "tags": [
+          "Commit-Boost - Mux"
+        ],
+        "operationId": "get_mux_config",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Mux config name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mux config details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MuxConfigResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Mux config not found"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Commit-Boost - Mux"
+        ],
+        "operationId": "update_mux_config",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Mux config name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMuxConfigRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Mux config updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MuxConfigResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Mux config not found"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Commit-Boost - Mux"
+        ],
+        "operationId": "delete_mux_config",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Mux config name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Mux config deleted"
+          },
+          "404": {
+            "description": "Mux config not found"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/admin/commit-boost/mux/{name}/keys": {
+      "post": {
+        "tags": [
+          "Commit-Boost - Mux"
+        ],
+        "operationId": "add_mux_keys",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Mux config name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MuxKeysRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Keys added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MuxKeysResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Mux config not found"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Commit-Boost - Mux"
+        ],
+        "operationId": "remove_mux_keys",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Mux config name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MuxKeysRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Keys removed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MuxKeysResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Mux config not found"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/admin/tokens": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "List all tokens",
+        "operationId": "list_tokens",
+        "responses": {
+          "200": {
+            "description": "List of tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TokenInfo"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Create a new token",
+        "operationId": "create_token",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTokenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Token created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateTokenResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/admin/tokens/{id}": {
+      "delete": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Delete a token by ID",
+        "operationId": "delete_token",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Token ID to delete",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Token deleted"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Token not found"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/admin/vouch/configs/default": {
+      "get": {
+        "tags": [
+          "Vouch - Default Configs"
+        ],
+        "operationId": "list_default_configs",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "fee_recipient",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "gas_limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "min_value",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "active",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "relay_url",
+            "in": "query",
+            "description": "Filter by relay URL (prefix match)",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "relay_min_value",
+            "in": "query",
+            "description": "Filter by relay min_value (exact match)",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of default configs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse_DefaultConfigListItem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Vouch - Default Configs"
+        ],
+        "operationId": "create_default_config",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDefaultConfigRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Config created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DefaultConfigResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Config already exists"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/admin/vouch/configs/default/{name}": {
+      "get": {
+        "tags": [
+          "Vouch - Default Configs"
+        ],
+        "operationId": "get_default_config",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Config name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default config details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DefaultConfigResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Config not found"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Vouch - Default Configs"
+        ],
+        "operationId": "update_default_config",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Config name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDefaultConfigRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Config updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DefaultConfigResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Config not found"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Vouch - Default Configs"
+        ],
+        "operationId": "delete_default_config",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Config name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Config deleted"
+          },
+          "404": {
+            "description": "Config not found"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/admin/vouch/proposer-patterns": {
+      "get": {
+        "tags": [
+          "Vouch - Proposer Patterns"
+        ],
+        "operationId": "list_proposer_patterns",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "pattern",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "tag",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "fee_recipient",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "gas_limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "min_value",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "reset_relays",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "relay_url",
+            "in": "query",
+            "description": "Filter by relay URL (prefix match)",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "relay_min_value",
+            "in": "query",
+            "description": "Filter by relay min_value (exact match)",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "relay_disabled",
+            "in": "query",
+            "description": "Filter by relay disabled status",
+            "required": false,
+            "schema": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of proposer patterns",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse_ProposerPatternListItem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Vouch - Proposer Patterns"
+        ],
+        "operationId": "create_proposer_pattern",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProposerPatternRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Pattern created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposerPatternResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Pattern already exists"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/admin/vouch/proposer-patterns/{name}": {
+      "get": {
+        "tags": [
+          "Vouch - Proposer Patterns"
+        ],
+        "operationId": "get_proposer_pattern",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Pattern name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Proposer pattern details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposerPatternResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Pattern not found"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Vouch - Proposer Patterns"
+        ],
+        "operationId": "update_proposer_pattern",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Pattern name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProposerPatternRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Pattern updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposerPatternResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Pattern not found"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Vouch - Proposer Patterns"
+        ],
+        "operationId": "delete_proposer_pattern",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Pattern name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Pattern deleted"
+          },
+          "404": {
+            "description": "Pattern not found"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/admin/vouch/proposers": {
+      "get": {
+        "tags": [
+          "Vouch - Proposers"
+        ],
+        "operationId": "list_proposers",
+        "parameters": [
+          {
+            "name": "public_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "fee_recipient",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "gas_limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "min_value",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "reset_relays",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "relay_url",
+            "in": "query",
+            "description": "Filter by relay URL (prefix match)",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "relay_min_value",
+            "in": "query",
+            "description": "Filter by relay min_value (exact match)",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "relay_disabled",
+            "in": "query",
+            "description": "Filter by relay disabled status",
+            "required": false,
+            "schema": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of proposers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse_ProposerListItem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/api/admin/vouch/proposers/{public_key}": {
+      "get": {
+        "tags": [
+          "Vouch - Proposers"
+        ],
+        "operationId": "get_proposer",
+        "parameters": [
+          {
+            "name": "public_key",
+            "in": "path",
+            "description": "Proposer public key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Proposer details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposerResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Proposer not found"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Vouch - Proposers"
+        ],
+        "operationId": "create_or_update_proposer",
+        "parameters": [
+          {
+            "name": "public_key",
+            "in": "path",
+            "description": "Proposer public key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOrUpdateProposerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Proposer updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposerResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Proposer created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposerResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Vouch - Proposers"
+        ],
+        "operationId": "delete_proposer",
+        "parameters": [
+          {
+            "name": "public_key",
+            "in": "path",
+            "description": "Proposer public key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Proposer deleted"
+          },
+          "404": {
+            "description": "Proposer not found"
+          }
+        },
+        "security": [
+          {
+            "bearer_auth": []
+          }
+        ]
+      }
+    },
+    "/commit-boost/v1/mux/{name}": {
+      "get": {
+        "tags": [
+          "Commit-Boost - Public"
+        ],
+        "operationId": "get_mux_keys_public",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Mux config name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of validator public keys",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/String"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Mux config not found"
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "operationId": "get_health",
+        "responses": {
+          "200": {
+            "description": "Service healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ready": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "operationId": "get_ready",
+        "responses": {
+          "200": {
+            "description": "Service ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/vouch/v2/execution-config/{config}": {
+      "post": {
+        "tags": [
+          "Vouch - Public"
+        ],
+        "operationId": "get_execution_config",
+        "parameters": [
+          {
+            "name": "config",
+            "in": "path",
+            "description": "Default config name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tags",
+            "in": "query",
+            "description": "Comma-separated list of tags",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/String"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Execution configuration",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionConfigResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Config not found"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CreateDefaultConfigRequest": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "fee_recipient": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/String"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "gas_limit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "min_value": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "relays": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": {
+              "$ref": "#/components/schemas/RelayConfig"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "CreateMuxConfigRequest": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "keys": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/String"
+            }
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateOrUpdateProposerRequest": {
+        "type": "object",
+        "properties": {
+          "fee_recipient": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/String"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "gas_limit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "min_value": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "relays": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ProposerRelayConfig"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "reset_relays": {
+            "type": "boolean"
+          }
+        }
+      },
+      "CreateProposerPatternRequest": {
+        "type": "object",
+        "required": [
+          "name",
+          "pattern"
+        ],
+        "properties": {
+          "fee_recipient": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/String"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "gas_limit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "min_value": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "pattern": {
+            "type": "string"
+          },
+          "relays": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ProposerRelayConfig"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "reset_relays": {
+            "type": "boolean"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "CreateTokenRequest": {
+        "type": "object",
+        "description": "Request body for creating a new token",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional longer description"
+          },
+          "name": {
+            "type": "string",
+            "description": "Short identifier for the token"
+          }
+        }
+      },
+      "CreateTokenResponse": {
+        "type": "object",
+        "description": "Response when a token is created (includes plaintext token)",
+        "required": [
+          "id",
+          "name",
+          "token"
+        ],
+        "properties": {
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "token": {
+            "type": "string",
+            "description": "The plaintext token - shown only once!"
+          }
+        }
+      },
+      "DefaultConfigListItem": {
+        "type": "object",
+        "required": [
+          "name",
+          "active",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "fee_recipient": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/String"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "gas_limit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "min_value": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "relays": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": {
+              "$ref": "#/components/schemas/RelayConfig"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DefaultConfigResponse": {
+        "type": "object",
+        "required": [
+          "name",
+          "active",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "fee_recipient": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/String"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "gas_limit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "min_value": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "relays": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": {
+              "$ref": "#/components/schemas/RelayConfig"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ErrorDetail": {
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorDetail"
+          }
+        }
+      },
+      "ExecutionConfigResponse": {
+        "type": "object",
+        "required": [
+          "version"
+        ],
+        "properties": {
+          "fee_recipient": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/String"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "gas_limit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "min_value": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "proposers": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ProposerEntry"
+            }
+          },
+          "relays": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": {
+              "$ref": "#/components/schemas/RelayConfig"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
+      "HealthResponse": {
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "MuxConfigListItem": {
+        "type": "object",
+        "required": [
+          "name",
+          "key_count",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "key_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "MuxConfigResponse": {
+        "type": "object",
+        "required": [
+          "name",
+          "keys",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "keys": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/String"
+            }
+          },
+          "name": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "MuxKeysRequest": {
+        "type": "object",
+        "required": [
+          "keys"
+        ],
+        "properties": {
+          "keys": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/String"
+            }
+          }
+        }
+      },
+      "MuxKeysResponse": {
+        "type": "object",
+        "required": [
+          "total_keys"
+        ],
+        "properties": {
+          "added": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "removed": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "total_keys": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "PaginatedResponse_DefaultConfigListItem": {
+        "type": "object",
+        "required": [
+          "data",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "name",
+                "active",
+                "created_at",
+                "updated_at"
+              ],
+              "properties": {
+                "active": {
+                  "type": "boolean"
+                },
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "fee_recipient": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/String"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "gas_limit": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "min_value": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "name": {
+                  "type": "string"
+                },
+                "relays": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "additionalProperties": {
+                    "$ref": "#/components/schemas/RelayConfig"
+                  },
+                  "propertyNames": {
+                    "type": "string"
+                  }
+                },
+                "updated_at": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              }
+            }
+          },
+          "limit": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "offset": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "PaginatedResponse_MuxConfigListItem": {
+        "type": "object",
+        "required": [
+          "data",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "name",
+                "key_count",
+                "created_at",
+                "updated_at"
+              ],
+              "properties": {
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "key_count": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "updated_at": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              }
+            }
+          },
+          "limit": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "offset": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "PaginatedResponse_ProposerListItem": {
+        "type": "object",
+        "required": [
+          "data",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "public_key",
+                "reset_relays",
+                "created_at",
+                "updated_at"
+              ],
+              "properties": {
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "fee_recipient": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/String"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "gas_limit": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "min_value": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "public_key": {
+                  "$ref": "#/components/schemas/String"
+                },
+                "relays": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "additionalProperties": {
+                    "$ref": "#/components/schemas/ProposerRelayConfig"
+                  },
+                  "propertyNames": {
+                    "type": "string"
+                  }
+                },
+                "reset_relays": {
+                  "type": "boolean"
+                },
+                "updated_at": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              }
+            }
+          },
+          "limit": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "offset": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "PaginatedResponse_ProposerPatternListItem": {
+        "type": "object",
+        "required": [
+          "data",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "name",
+                "pattern",
+                "tags",
+                "reset_relays",
+                "created_at",
+                "updated_at"
+              ],
+              "properties": {
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "fee_recipient": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/String"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "gas_limit": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "min_value": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "name": {
+                  "type": "string"
+                },
+                "pattern": {
+                  "type": "string"
+                },
+                "reset_relays": {
+                  "type": "boolean"
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "updated_at": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              }
+            }
+          },
+          "limit": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "offset": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ProposerEntry": {
+        "type": "object",
+        "description": "Entry in proposers array - can be either a specific validator key or a regex pattern",
+        "required": [
+          "proposer"
+        ],
+        "properties": {
+          "fee_recipient": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/String"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "gas_limit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "min_value": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "proposer": {
+            "type": "string",
+            "description": "Validator public key (BlsPubkey) or regex pattern (String)"
+          },
+          "relays": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": {
+              "$ref": "#/components/schemas/RelayConfig"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "reset_relays": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        }
+      },
+      "ProposerListItem": {
+        "type": "object",
+        "required": [
+          "public_key",
+          "reset_relays",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "fee_recipient": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/String"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "gas_limit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "min_value": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "public_key": {
+            "$ref": "#/components/schemas/String"
+          },
+          "relays": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ProposerRelayConfig"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "reset_relays": {
+            "type": "boolean"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ProposerPatternListItem": {
+        "type": "object",
+        "required": [
+          "name",
+          "pattern",
+          "tags",
+          "reset_relays",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "fee_recipient": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/String"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "gas_limit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "min_value": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "pattern": {
+            "type": "string"
+          },
+          "reset_relays": {
+            "type": "boolean"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ProposerPatternResponse": {
+        "type": "object",
+        "required": [
+          "name",
+          "pattern",
+          "tags",
+          "reset_relays",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "fee_recipient": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/String"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "gas_limit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "min_value": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "pattern": {
+            "type": "string"
+          },
+          "relays": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ProposerRelayConfig"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "reset_relays": {
+            "type": "boolean"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ProposerRelayConfig": {
+        "type": "object",
+        "required": [
+          "public_key"
+        ],
+        "properties": {
+          "disabled": {
+            "type": "boolean",
+            "description": "Only serialized when true"
+          },
+          "fee_recipient": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/String"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "gas_limit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "min_value": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "public_key": {
+            "$ref": "#/components/schemas/String"
+          }
+        }
+      },
+      "ProposerResponse": {
+        "type": "object",
+        "required": [
+          "public_key",
+          "reset_relays",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "fee_recipient": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/String"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "gas_limit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "min_value": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "public_key": {
+            "$ref": "#/components/schemas/String"
+          },
+          "relays": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ProposerRelayConfig"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "reset_relays": {
+            "type": "boolean"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "RelayConfig": {
+        "type": "object",
+        "required": [
+          "public_key"
+        ],
+        "properties": {
+          "disabled": {
+            "type": "boolean",
+            "description": "Only serialized when true"
+          },
+          "fee_recipient": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/String"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "gas_limit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "min_value": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "public_key": {
+            "$ref": "#/components/schemas/String"
+          }
+        }
+      },
+      "String": {
+        "type": "array",
+        "items": {
+          "type": "integer",
+          "format": "int32",
+          "minimum": 0
+        },
+        "description": "BLS public key (48 bytes, hex-encoded with 0x prefix)",
+        "example": "0x8021cef5a095e4a4476d5a56d0e63e7ddb5e66ba5349fe1bc341f94f0f07a0dbfd19755b9820022e6b9153e28fce90e8"
+      },
+      "TokenInfo": {
+        "type": "object",
+        "description": "API response for token info (excludes hash)",
+        "required": [
+          "id",
+          "name",
+          "created_at",
+          "active"
+        ],
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "last_used_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "UpdateDefaultConfigRequest": {
+        "type": "object",
+        "properties": {
+          "active": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "fee_recipient": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/String"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "gas_limit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "min_value": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "relays": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": {
+              "$ref": "#/components/schemas/RelayConfig"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "UpdateMuxConfigRequest": {
+        "type": "object",
+        "properties": {
+          "keys": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/String"
+            }
+          }
+        }
+      },
+      "UpdateProposerPatternRequest": {
+        "type": "object",
+        "properties": {
+          "fee_recipient": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/String"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "gas_limit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "min_value": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pattern": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "relays": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ProposerRelayConfig"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "reset_relays": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "tags": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "bearer_auth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "token",
+        "description": "API token for authentication"
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Health",
+      "description": "Service health endpoints"
+    },
+    {
+      "name": "Auth",
+      "description": "API token management"
+    },
+    {
+      "name": "Vouch - Public",
+      "description": "Public Vouch endpoints for execution configuration"
+    },
+    {
+      "name": "Vouch - Proposers",
+      "description": "Admin endpoints for managing proposer configurations"
+    },
+    {
+      "name": "Vouch - Default Configs",
+      "description": "Admin endpoints for managing default configurations"
+    },
+    {
+      "name": "Vouch - Proposer Patterns",
+      "description": "Admin endpoints for managing proposer patterns"
+    },
+    {
+      "name": "Commit-Boost - Public",
+      "description": "Public Commit-Boost endpoints"
+    },
+    {
+      "name": "Commit-Boost - Mux",
+      "description": "Admin endpoints for managing mux configurations"
+    }
+  ]
+}

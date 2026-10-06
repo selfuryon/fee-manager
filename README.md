@@ -183,7 +183,27 @@ Tokens are stored in the database. On first startup, a default token is auto-gen
 
 ## API Documentation
 
+The API contract is [`openapi.json`](./openapi.json), generated from the handlers' utoipa annotations. A test fails when it drifts from the code; regenerate it with:
+
+```bash
+UPDATE_OPENAPI=1 cargo test --test openapi_test
+```
+
 Swagger UI is available at `/swagger-ui` when the service is running.
+
+### Execution config semantics
+
+`POST /vouch/v2/execution-config/{config}` takes a plain JSON array of validator public keys and returns a Vouch [execution config v2](https://github.com/attestantio/vouch/blob/master/docs/executionconfig.md):
+
+1. Top-level `fee_recipient`, `gas_limit`, `min_value` and `relays` come from the default config named by `{config}` (`404` if it does not exist).
+2. `proposers` lists the configs of the requested keys that are known to the service. Unknown keys are omitted, so Vouch applies the defaults to them.
+3. `proposers` then lists the pattern configs whose tags match `?tags=` (OR logic), ordered by the position of their first matching tag in the request.
+
+Vouch uses the first `proposers` entry that matches, so validator-specific entries take precedence over patterns. Within an entry, an omitted field falls back to the default. Relays are merged with the default relays unless `reset_relays: true`; a proposer relay marked `disabled: true` is passed through and Vouch skips it.
+
+### List filters
+
+Vouch list endpoints accept a query parameter per field, combined with AND: prefix match for names, public keys and relay URLs; substring match for `pattern`; exact match for everything else; `tag` matches patterns that carry that tag; `relay_*` filters match configs that have at least one such relay. They paginate with `limit` (default 100) and `offset`.
 
 ## Usage Examples
 
@@ -192,7 +212,7 @@ Swagger UI is available at `/swagger-ui` when the service is running.
 ```bash
 curl -X POST "http://localhost:3000/vouch/v2/execution-config/main?tags=pool-1,high-value" \
   -H "Content-Type: application/json" \
-  -d '{"keys": ["0x8021...8bbe", "0xa123...def4"]}'
+  -d '["0x8021...8bbe", "0xa123...def4"]'
 ```
 
 ### Get Mux Keys (Commit-Boost)

@@ -51,6 +51,9 @@ pub enum ApiError {
     #[error("Method not allowed")]
     MethodNotAllowed,
 
+    #[error("Service unavailable")]
+    ServiceUnavailable,
+
     #[error("Unauthorized")]
     Unauthorized,
 
@@ -110,6 +113,11 @@ impl ApiError {
                 StatusCode::METHOD_NOT_ALLOWED,
                 "METHOD_NOT_ALLOWED",
                 "Method not allowed".to_string(),
+            ),
+            ApiError::ServiceUnavailable => (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "SERVICE_UNAVAILABLE",
+                "Service is not ready".to_string(),
             ),
             ApiError::Unauthorized => (
                 StatusCode::UNAUTHORIZED,
@@ -194,6 +202,9 @@ mod tests {
             StatusCode::METHOD_NOT_ALLOWED
         );
         assert_eq!(detail(ApiError::Unauthorized).0, StatusCode::UNAUTHORIZED);
+        let (status, code, _) = detail(ApiError::ServiceUnavailable);
+        assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(code, "SERVICE_UNAVAILABLE");
         assert_eq!(
             detail(ApiError::DatabaseError(sqlx::Error::RowNotFound)).0,
             StatusCode::NOT_FOUND

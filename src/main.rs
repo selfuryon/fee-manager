@@ -2,6 +2,7 @@
 use fee_manager::{AppState, config, create_router, run_migrations};
 use sqlx::postgres::PgPoolOptions;
 use std::sync::Arc;
+use tokio::signal::unix::{SignalKind, signal};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
@@ -54,6 +55,9 @@ async fn main() {
         }
     }
 
+    // Kept to close the pool once the server has drained
+    let pool_handle = pool.clone();
+
     // Create shared state
     let state = Arc::new(AppState {
         pool,
@@ -67,5 +71,33 @@ async fn main() {
     let addr = &config.address();
     tracing::info!("Listening on {}", addr);
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-    axum::serve(listener, app).await.unwrap();
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await
+        .unwrap();
+
+    pool_handle.close().await;
+    tracing::info!("Shutdown complete");
+}
+
+/// Resolves on SIGTERM (Kubernetes, `podman stop`) or Ctrl-C. In the container
+/// the binary is PID 1, so without this handler SIGTERM is ignored and every
+/// stop ends in SIGKILL after the grace period.
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("Failed to install Ctrl-C handler");
+    };
+    let terminate = async {
+        signal(SignalKind::terminate())
+            .expect("Failed to install SIGTERM handler")
+            .recv()
+            .await;
+    };
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
+    tracing::info!("Shutdown signal received, draining connections");
 }

@@ -671,3 +671,186 @@ async fn test_filter_by_relay_min_value() {
     delete_config(app, &name_with_min).await;
     delete_config(app, &name_without_min).await;
 }
+
+// ============================================================================
+// Validation Tests
+// ============================================================================
+
+const RELAY_KEY: &str = "0x8b5d2e73e2a3a55c6c87b8b6eb92e0149a125c852751db1422fa951e42a09b82c142c3ea98d0d9930b056a3bc9896b8f";
+
+/// POSTs a config and returns (status, error message if any)
+async fn create_config(app: &TestApp, body: serde_json::Value) -> (u16, Option<String>) {
+    let response = app
+        .client()
+        .post(format!("{}/api/admin/vouch/configs/default", app.address))
+        .json(&body)
+        .send()
+        .await
+        .expect("Failed to send request");
+    let status = response.status().as_u16();
+    let body: serde_json::Value = response.json().await.unwrap_or_default();
+    (status, body["error"]["message"].as_str().map(String::from))
+}
+
+async fn config_exists(app: &TestApp, name: &str) -> bool {
+    app.client()
+        .get(format!(
+            "{}/api/admin/vouch/configs/default/{}",
+            app.address, name
+        ))
+        .send()
+        .await
+        .expect("Failed to send request")
+        .status()
+        == 200
+}
+
+#[tokio::test]
+async fn test_create_default_config_rejects_invalid_values() {
+    let app = TestApp::get().await;
+
+    let cases = [
+        ("gas_limit", json!({"gas_limit": "lots"})),
+        ("min_value", json!({"min_value": "cheap"})),
+        ("min_value", json!({"min_value": "-1"})),
+        (
+            "url",
+            json!({"relays": {"relay.example.invalid": {"public_key": RELAY_KEY}}}),
+        ),
+        (
+            "url",
+            json!({"relays": {"ftp://relay.example.invalid/": {"public_key": RELAY_KEY}}}),
+        ),
+        (
+            "gas_limit",
+            json!({"relays": {"https://relay.example.invalid/": {"public_key": RELAY_KEY, "gas_limit": "lots"}}}),
+        ),
+    ];
+
+    for (field, extra) in cases {
+        let name = unique_config_name("invalid");
+        let mut body = json!({"name": name, "active": true});
+        body.as_object_mut()
+            .unwrap()
+            .extend(extra.as_object().unwrap().clone());
+
+        let (status, message) = create_config(app, body).await;
+        assert_eq!(status, 400, "{extra} should be rejected");
+        let message = message.expect("error body");
+        assert!(message.contains(field), "{message:?} should name {field}");
+        assert!(
+            !config_exists(app, &name).await,
+            "{extra} must not be stored"
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_relay_error_names_relay_url() {
+    let app = TestApp::get().await;
+    let (status, message) = create_config(
+        app,
+        json!({
+            "name": unique_config_name("relay_msg"),
+            "active": true,
+            "relays": {"https://relay.example.invalid/": {"public_key": RELAY_KEY, "min_value": "cheap"}}
+        }),
+    )
+    .await;
+    assert_eq!(status, 400);
+    let message = message.expect("error body");
+    assert!(message.contains("min_value") && message.contains("https://relay.example.invalid/"));
+}
+
+#[tokio::test]
+async fn test_valid_values_stored_as_sent() {
+    let app = TestApp::get().await;
+    let name = unique_config_name("as_sent");
+    let (status, _) = create_config(
+        app,
+        json!({
+            "name": name,
+            "active": true,
+            "gas_limit": "30000000",
+            "min_value": "0.10",
+            "relays": {"https://relay.example.invalid/": {"public_key": RELAY_KEY, "min_value": "0"}}
+        }),
+    )
+    .await;
+    assert_eq!(status, 201);
+
+    let body: DefaultConfigResponse = app
+        .client()
+        .get(format!(
+            "{}/api/admin/vouch/configs/default/{}",
+            app.address, name
+        ))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(body.min_value.as_deref(), Some("0.10"));
+    assert!(
+        body.relays
+            .unwrap()
+            .contains_key("https://relay.example.invalid/")
+    );
+
+    delete_config(app, &name).await;
+}
+
+#[tokio::test]
+async fn test_update_with_invalid_relay_keeps_existing_relays() {
+    let app = TestApp::get().await;
+    let name = unique_config_name("upd_relay");
+    let (status, _) = create_config(
+        app,
+        json!({
+            "name": name,
+            "active": true,
+            "relays": {"https://old.example.invalid/": {"public_key": RELAY_KEY}}
+        }),
+    )
+    .await;
+    assert_eq!(status, 201);
+
+    let url = format!("{}/api/admin/vouch/configs/default/{}", app.address, name);
+    let response = app
+        .client()
+        .put(&url)
+        .json(&json!({"relays": {
+            "https://new.example.invalid/": {"public_key": RELAY_KEY},
+            "not a url": {"public_key": RELAY_KEY}
+        }}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 400);
+
+    let body: DefaultConfigResponse = app
+        .client()
+        .get(&url)
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let relays = body.relays.unwrap();
+    assert_eq!(relays.len(), 1);
+    assert!(relays.contains_key("https://old.example.invalid/"));
+
+    // Only `active` sent: nothing else is validated or changed
+    let response = app
+        .client()
+        .put(&url)
+        .json(&json!({"active": false}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 200);
+
+    delete_config(app, &name).await;
+}

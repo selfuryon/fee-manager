@@ -228,7 +228,8 @@ pub async fn get_proposer(
     request_body = CreateOrUpdateProposerRequest,
     responses(
         (status = 200, description = "Proposer updated", body = ProposerResponse),
-        (status = 201, description = "Proposer created", body = ProposerResponse)
+        (status = 201, description = "Proposer created", body = ProposerResponse),
+        (status = 400, description = "Invalid field value", body = crate::errors::ErrorResponse)
     ),
     tag = "Vouch - Proposers",
     security(("bearer_auth" = []))
@@ -241,6 +242,8 @@ pub async fn create_or_update_proposer(
     Json(req): Json<CreateOrUpdateProposerRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
     info!("Creating/updating proposer: {}", public_key);
+
+    req.validate()?;
 
     let mut tx = state.pool.begin().await?;
 

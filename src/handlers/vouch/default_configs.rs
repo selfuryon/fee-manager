@@ -217,6 +217,7 @@ pub async fn get_default_config(
     request_body = CreateDefaultConfigRequest,
     responses(
         (status = 201, description = "Config created", body = DefaultConfigResponse),
+        (status = 400, description = "Invalid field value", body = crate::errors::ErrorResponse),
         (status = 409, description = "Config already exists")
     ),
     tag = "Vouch - Default Configs",
@@ -229,6 +230,8 @@ pub async fn create_default_config(
     Json(req): Json<CreateDefaultConfigRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
     info!("Creating default config: {}", req.name);
+
+    req.validate()?;
 
     let mut tx = state.pool.begin().await?;
 
@@ -346,6 +349,7 @@ pub async fn create_default_config(
     request_body = UpdateDefaultConfigRequest,
     responses(
         (status = 200, description = "Config updated", body = DefaultConfigResponse),
+        (status = 400, description = "Invalid field value", body = crate::errors::ErrorResponse),
         (status = 404, description = "Config not found")
     ),
     tag = "Vouch - Default Configs",
@@ -359,6 +363,8 @@ pub async fn update_default_config(
     Json(req): Json<UpdateDefaultConfigRequest>,
 ) -> Result<Json<DefaultConfigResponse>, ApiError> {
     info!("Updating default config: {}", name);
+
+    req.validate()?;
 
     let mut tx = state.pool.begin().await?;
 

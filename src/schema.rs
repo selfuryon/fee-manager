@@ -6,7 +6,7 @@ use crate::models::{
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use utoipa::ToSchema;
 
 // ============================================================================
@@ -261,7 +261,7 @@ pub struct ExecutionConfigResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub min_value: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub relays: Option<HashMap<String, RelayConfig>>,
+    pub relays: Option<BTreeMap<String, RelayConfig>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub proposers: Option<Vec<ProposerEntry>>,
 }
@@ -280,7 +280,7 @@ pub struct ProposerEntry {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reset_relays: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub relays: Option<HashMap<String, RelayConfig>>,
+    pub relays: Option<BTreeMap<String, RelayConfig>>,
 }
 
 // ============================================================================

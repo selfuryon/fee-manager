@@ -793,3 +793,85 @@ async fn test_filter_patterns_by_relay_disabled() {
     delete_pattern(app, &name_disabled).await;
     delete_pattern(app, &name_enabled).await;
 }
+
+// ============================================================================
+// Validation Tests
+// ============================================================================
+
+#[tokio::test]
+async fn test_pattern_validation() {
+    let app = TestApp::get().await;
+    let base = format!("{}/api/admin/vouch/proposer-patterns", app.address);
+
+    // A pattern that does not compile is rejected and nothing is stored
+    let bad = unique_pattern_name("badre");
+    let response = app
+        .client()
+        .post(&base)
+        .json(&json!({"name": bad, "pattern": "([unclosed", "tags": ["test"]}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 400);
+    let error: serde_json::Value = response.json().await.unwrap();
+    assert!(
+        error["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("pattern")
+    );
+    let response = app
+        .client()
+        .get(format!("{base}/{bad}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 404);
+
+    // Invalid min_value on create is rejected
+    let response = app
+        .client()
+        .post(&base)
+        .json(
+            &json!({"name": unique_pattern_name("badmin"), "pattern": "^x$", "min_value": "cheap"}),
+        )
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 400);
+
+    // Valid values round-trip unchanged
+    let name = unique_pattern_name("valid");
+    let response = app
+        .client()
+        .post(&base)
+        .json(&json!({"name": name, "pattern": "^pool/.*$", "min_value": "0.10"}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 201);
+    let stored: ProposerPatternResponse = response.json().await.unwrap();
+    assert_eq!(stored.min_value.as_deref(), Some("0.10"));
+
+    // An invalid pattern on update is rejected and the stored one is kept
+    let response = app
+        .client()
+        .put(format!("{base}/{name}"))
+        .json(&json!({"pattern": "([unclosed"}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 400);
+    let stored: ProposerPatternResponse = app
+        .client()
+        .get(format!("{base}/{name}"))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(stored.pattern, "^pool/.*$");
+
+    delete_pattern(app, &name).await;
+}

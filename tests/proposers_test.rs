@@ -699,3 +699,50 @@ async fn test_filter_proposers_by_relay_disabled() {
     delete_proposer(app, &pubkey_disabled).await;
     delete_proposer(app, &pubkey_enabled).await;
 }
+
+// ============================================================================
+// Validation Tests
+// ============================================================================
+
+#[tokio::test]
+async fn test_update_proposer_rejects_invalid_values() {
+    let app = TestApp::get().await;
+    let pubkey = TestApp::test_bls_pubkey(&format!("ba{}", TestApp::unique_id()));
+    let url = format!("{}/api/admin/vouch/proposers/{}", app.address, pubkey);
+
+    let response = app
+        .client()
+        .put(&url)
+        .json(&json!({"gas_limit": "30000000", "min_value": "0.1"}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 201);
+
+    let relay_key = TestApp::test_bls_pubkey("bb");
+    for body in [
+        json!({"gas_limit": "0"}),
+        json!({"min_value": "1e-3"}),
+        json!({"relays": {"relay.example.invalid": {"public_key": relay_key}}}),
+    ] {
+        let response = app.client().put(&url).json(&body).send().await.unwrap();
+        assert_eq!(response.status(), 400, "{body} should be rejected");
+        let error: serde_json::Value = response.json().await.unwrap();
+        assert_eq!(error["error"]["code"], "INVALID_DATA");
+    }
+
+    let stored: ProposerResponse = app
+        .client()
+        .get(&url)
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(stored.gas_limit.as_deref(), Some("30000000"));
+    assert_eq!(stored.min_value.as_deref(), Some("0.1"));
+    assert!(stored.relays.is_none());
+
+    delete_proposer(app, &pubkey).await;
+}

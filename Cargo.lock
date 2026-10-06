@@ -636,6 +636,7 @@ dependencies = [
  "config",
  "hex",
  "rand 0.10.3",
+ "regex",
  "reqwest",
  "rust_decimal",
  "serde",

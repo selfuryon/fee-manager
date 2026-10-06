@@ -10,6 +10,7 @@ pub mod handlers;
 pub mod models;
 pub mod openapi;
 pub mod schema;
+pub mod validation;
 
 pub use config::AppConfig;
 pub use handlers::create_router;

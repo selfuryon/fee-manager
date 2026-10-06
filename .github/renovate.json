@@ -1,0 +1,34 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "prHourlyLimit": 6,
+  "minimumReleaseAge": "7 days",
+  "minimumReleaseAgeBehaviour": "timestamp-optional",
+  "packageRules": [
+    {
+      "matchDepTypes": ["action"],
+      "pinDigests": true
+    },
+    {
+      "description": "Pin container images by digest: a tag is mutable and upstream does re-push them. Renovate refreshes the digest together with the tag.",
+      "matchDatasources": ["docker"],
+      "pinDigests": true
+    },
+    {
+      "description": "Set PR labels",
+      "matchPackageNames": [".*"],
+      "labels": ["renovate"]
+    }
+  ],
+  "dependencyDashboard": true,
+  "semanticCommits": "enabled",
+  "commitMessagePrefix": "chore(deps):",
+  "vulnerabilityAlerts": {
+    "description": "Security fixes skip the minimumReleaseAge soak and the PR rate limits.",
+    "enabled": true,
+    "minimumReleaseAge": null,
+    "prCreation": "immediate",
+    "labels": ["renovate", "security"]
+  },
+  "osvVulnerabilityAlerts": true
+}

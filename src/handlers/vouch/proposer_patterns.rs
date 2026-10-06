@@ -206,6 +206,7 @@ pub async fn get_proposer_pattern(
     request_body = CreateProposerPatternRequest,
     responses(
         (status = 201, description = "Pattern created", body = ProposerPatternResponse),
+        (status = 400, description = "Invalid field value", body = crate::errors::ErrorResponse),
         (status = 409, description = "Pattern already exists")
     ),
     tag = "Vouch - Proposer Patterns",
@@ -218,6 +219,8 @@ pub async fn create_proposer_pattern(
     Json(req): Json<CreateProposerPatternRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
     info!("Creating proposer pattern: {}", req.name);
+
+    req.validate()?;
 
     let mut tx = state.pool.begin().await?;
 
@@ -343,6 +346,7 @@ pub async fn create_proposer_pattern(
     request_body = UpdateProposerPatternRequest,
     responses(
         (status = 200, description = "Pattern updated", body = ProposerPatternResponse),
+        (status = 400, description = "Invalid field value", body = crate::errors::ErrorResponse),
         (status = 404, description = "Pattern not found")
     ),
     tag = "Vouch - Proposer Patterns",
@@ -356,6 +360,8 @@ pub async fn update_proposer_pattern(
     Json(req): Json<UpdateProposerPatternRequest>,
 ) -> Result<Json<ProposerPatternResponse>, ApiError> {
     info!("Updating proposer pattern: {}", name);
+
+    req.validate()?;
 
     let mut tx = state.pool.begin().await?;
 

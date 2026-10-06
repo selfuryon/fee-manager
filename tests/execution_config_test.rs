@@ -576,3 +576,179 @@ async fn test_get_execution_config_multiple_proposers() {
     }
     delete_config(app, &config_name).await;
 }
+
+// ============================================================================
+// Ordering, determinism and batching
+// ============================================================================
+
+async fn create_config(app: &TestApp, name: &str) {
+    let response = app
+        .client()
+        .post(format!("{}/api/admin/vouch/configs/default", app.address))
+        .json(&json!({
+            "name": name,
+            "active": true,
+            "relays": {
+                "https://b.relay.example.invalid/": {"public_key": TestApp::test_bls_pubkey("b1")},
+                "https://a.relay.example.invalid/": {"public_key": TestApp::test_bls_pubkey("a1")}
+            }
+        }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 201);
+}
+
+async fn create_pattern(app: &TestApp, name: &str, tag: &str) {
+    let response = app
+        .client()
+        .post(format!("{}/api/admin/vouch/proposer-patterns", app.address))
+        .json(&json!({"name": name, "pattern": format!("^{name}/.*$"), "tags": [tag]}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 201);
+}
+
+#[tokio::test]
+async fn test_many_keys_ordered_with_relays() {
+    let app = TestApp::get().await;
+    let id = TestApp::unique_id();
+    let config_name = unique_config_name("many");
+    create_config(app, &config_name).await;
+
+    // Requested in reverse and created concurrently, so neither request order
+    // nor insertion order matches key order
+    let keys: Vec<String> = (0..200)
+        .rev()
+        .map(|i| TestApp::test_bls_pubkey(&format!("e0{id}{i:04x}")))
+        .collect();
+    let mut creates = tokio::task::JoinSet::new();
+    for (i, key) in keys.iter().cloned().enumerate() {
+        creates.spawn(async move {
+            app.client()
+                .put(format!("{}/api/admin/vouch/proposers/{}", app.address, key))
+                .json(&json!({"relays": {
+                    format!("https://r{i}.relay.example.invalid/"): {"public_key": TestApp::test_bls_pubkey("c1")}
+                }}))
+                .send()
+                .await
+                .unwrap()
+                .status()
+        });
+    }
+    for status in creates.join_all().await {
+        assert_eq!(status, 201);
+    }
+
+    let started = std::time::Instant::now();
+    let response = app
+        .client_unauthenticated()
+        .post(format!(
+            "{}/vouch/v2/execution-config/{}",
+            app.address, config_name
+        ))
+        .json(&keys)
+        .send()
+        .await
+        .unwrap();
+    let elapsed = started.elapsed();
+    assert_eq!(response.status(), 200);
+    let body: ExecutionConfigResponse = response.json().await.unwrap();
+
+    let proposers = body.proposers.unwrap();
+    let returned: Vec<&str> = proposers.iter().map(|p| p.proposer.as_str()).collect();
+    let mut expected: Vec<&str> = keys.iter().map(String::as_str).collect();
+    expected.sort();
+    assert_eq!(returned, expected, "entries must be ordered by public key");
+    for (i, key) in keys.iter().enumerate() {
+        let entry = proposers.iter().find(|p| &p.proposer == key).unwrap();
+        let relays = entry.relays.as_ref().unwrap();
+        assert_eq!(relays.len(), 1);
+        assert!(relays.contains_key(&format!("https://r{i}.relay.example.invalid/")));
+    }
+    assert!(elapsed.as_secs_f64() < 1.0, "took {elapsed:?}");
+
+    let mut deletes = tokio::task::JoinSet::new();
+    for key in keys {
+        deletes.spawn(async move { delete_proposer(app, &key).await });
+    }
+    deletes.join_all().await;
+    delete_config(app, &config_name).await;
+}
+
+#[tokio::test]
+async fn test_pattern_ties_ordered_by_name() {
+    let app = TestApp::get().await;
+    let id = TestApp::unique_id();
+    let config_name = unique_config_name("tie");
+    let tag = format!("tie_{id}");
+    let (zeta, alpha) = (format!("zeta_{id}"), format!("alpha_{id}"));
+    create_config(app, &config_name).await;
+    // zeta first, so insertion order would put it first
+    create_pattern(app, &zeta, &tag).await;
+    create_pattern(app, &alpha, &tag).await;
+
+    for _ in 0..5 {
+        let body: ExecutionConfigResponse = app
+            .client_unauthenticated()
+            .post(format!(
+                "{}/vouch/v2/execution-config/{}?tags={}",
+                app.address, config_name, tag
+            ))
+            .json(&json!([]))
+            .send()
+            .await
+            .unwrap()
+            .json()
+            .await
+            .unwrap();
+        let order: Vec<String> = body
+            .proposers
+            .unwrap()
+            .into_iter()
+            .map(|p| p.proposer)
+            .collect();
+        assert_eq!(order, vec![format!("^{alpha}/.*$"), format!("^{zeta}/.*$")]);
+    }
+
+    delete_pattern(app, &zeta).await;
+    delete_pattern(app, &alpha).await;
+    delete_config(app, &config_name).await;
+}
+
+#[tokio::test]
+async fn test_identical_requests_identical_bodies() {
+    let app = TestApp::get().await;
+    let id = TestApp::unique_id();
+    let config_name = unique_config_name("bytes");
+    let tag = format!("bytes_{id}");
+    let pattern = format!("p_{id}");
+    create_config(app, &config_name).await;
+    create_pattern(app, &pattern, &tag).await;
+
+    let fetch = || async {
+        app.client_unauthenticated()
+            .post(format!(
+                "{}/vouch/v2/execution-config/{}?tags={}",
+                app.address, config_name, tag
+            ))
+            .json(&json!([]))
+            .send()
+            .await
+            .unwrap()
+            .bytes()
+            .await
+            .unwrap()
+    };
+    let first = fetch().await;
+    for _ in 0..5 {
+        assert_eq!(fetch().await, first);
+    }
+    // Relay keys serialize in sorted order
+    let text = String::from_utf8(first.to_vec()).unwrap();
+    assert!(text.find("https://a.relay").unwrap() < text.find("https://b.relay").unwrap());
+
+    delete_pattern(app, &pattern).await;
+    delete_config(app, &config_name).await;
+}

@@ -201,6 +201,19 @@ Swagger UI is available at `/swagger-ui` when the service is running.
 
 Vouch uses the first `proposers` entry that matches, so validator-specific entries take precedence over patterns. Within an entry, an omitted field falls back to the default. Relays are merged with the default relays unless `reset_relays: true`; a proposer relay marked `disabled: true` is passed through and Vouch skips it.
 
+### Accepted values
+
+Admin create and update requests are validated before anything is stored, including the fields of every relay; an invalid value fails the whole request with `400` `INVALID_DATA` and a message naming the field:
+
+| Field | Accepted |
+|-------|----------|
+| `gas_limit` | positive integer in decimal digits, e.g. `"30000000"` |
+| `min_value` | non-negative decimal amount of ETH, e.g. `"0"`, `"0.1"` (no sign, exponent or bare `.5`) |
+| relay URL (`relays` key) | absolute `http`/`https` URL with a host; stored exactly as sent, trailing slash included |
+| `pattern` | a regular expression that compiles (RE2 syntax, as Vouch uses) |
+
+Values are stored as sent, without normalization.
+
 ### List filters
 
 Vouch list endpoints accept a query parameter per field, combined with AND: prefix match for names, public keys and relay URLs; substring match for `pattern`; exact match for everything else; `tag` matches patterns that carry that tag; `relay_*` filters match configs that have at least one such relay. They paginate with `limit` (default 100) and `offset`.

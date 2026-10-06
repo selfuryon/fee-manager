@@ -9,12 +9,7 @@ REST API microservice in Rust for managing validator configurations for Ethereum
 
 The service allows centralized configuration management.
 
-## Technical Stack
-
-- **Language**: Rust
-- **Web Framework**: Axum
-- **Database**: PostgreSQL with SQLx
-- **Keep it simple**: small microservice without over-engineering
+**Keep it simple**: small microservice without over-engineering.
 
 ## Core Concepts
 
@@ -68,14 +63,14 @@ Reference: https://github.com/attestantio/vouch/blob/master/docs/executionconfig
 
 ## API Structure
 
-See [API_SPEC.md](./API_SPEC.md) for complete API specification.
+The API contract is [openapi.json](./openapi.json), generated from the utoipa annotations; semantics are in the README.
 
 ### Public Endpoints (No Auth)
 
 #### Vouch
 ```
 POST /vouch/v2/execution-config/:config?tags=pool-1,high-value
-Body: { "keys": ["0x...", "0x..."] }
+Body: ["0x...", "0x..."]
 Response: { version: 2, fee_recipient: "0x...", relays: {...}, proposers: [...] }
 ```
 
@@ -96,52 +91,7 @@ Response: ["0x...", "0x...", "0x..."]
 
 ### Protected Endpoints (Auth Required)
 
-All protected endpoints use `/api/admin/*` prefix:
-
-**Vouch Management:**
-- `/api/admin/vouch/proposers` - CRUD for proposer-specific configs (validator public_key + config + relays)
-- `/api/admin/vouch/configs/default` - CRUD for named default configs with relays
-- `/api/admin/vouch/proposer-patterns` - CRUD for pattern-based proposer configs with tags and relays
-
-**Commit-Boost Management:**
-- `/api/admin/commit-boost/mux` - CRUD for mux configs
-- `/api/admin/commit-boost/mux/:name/keys` - Add/remove keys from mux
-
-## Data Model Overview
-
-### Database Schema
-
-See [schema.sql](./schema.sql) for complete PostgreSQL schema.
-
-### Vouch Tables
-
-- **vouch_default_configs**: Named default configs (PK: name)
-  - Fields: name, fee_recipient, gas_limit, min_value, active, timestamps
-
-- **vouch_default_relays**: Relays for default configs (FK: config_name)
-  - Fields: url, public_key, fee_recipient, gas_limit, min_value
-
-- **vouch_proposers**: Proposer-specific configs (PK: public_key)
-  - Fields: public_key, fee_recipient, gas_limit, min_value, reset_relays, timestamps
-
-- **vouch_proposer_relays**: Relays for proposers (FK: proposer_public_key)
-  - Fields: url, public_key, fee_recipient, gas_limit, min_value, disabled
-
-- **vouch_proposer_patterns**: Pattern configs with tags (PK: name)
-  - Fields: name, pattern, tags (TEXT[]), fee_recipient, gas_limit, min_value, reset_relays, timestamps
-  - GIN index on tags for fast searches
-
-- **vouch_proposer_pattern_relays**: Relays for patterns (FK: pattern_name)
-  - Fields: url, public_key, fee_recipient, gas_limit, min_value
-
-### Commit-Boost Tables
-
-- **commit_boost_mux_configs**: Mux configs (PK: name)
-  - Fields: name, timestamps
-
-- **commit_boost_mux_keys**: Keys in mux (FK: mux_name)
-  - Fields: mux_name, public_key
-  - Unique constraint: (mux_name, public_key)
+All management endpoints live under `/api/admin/vouch/*` and `/api/admin/commit-boost/*`.
 
 ## Key Design Decisions
 
@@ -157,7 +107,7 @@ See [schema.sql](./schema.sql) for complete PostgreSQL schema.
 
 5. **Config name in path**: Default config specified as path parameter (e.g., `/vouch/v2/execution-config/main`) instead of query param
 
-6. **Structured request body**: Request body is `{"keys": [...]}` not just raw array
+6. **Raw array request body**: the execution-config body is a plain JSON array of public keys, not `{"keys": [...]}`
 
 7. **Rich filtering**: All list endpoints support filtering via query parameters for all fields (string prefix/exact match, numeric exact match, boolean true/false, tags array contains)
 
@@ -167,15 +117,6 @@ See [schema.sql](./schema.sql) for complete PostgreSQL schema.
 # Vouch checks configuration for a validator
 vouch --proposer-config-check 0x8021...8bbe | jq .
 ```
-
-## Database Notes
-
-- **Schema**: PostgreSQL with SQLx (see schema.sql)
-- **Timestamps**: Auto-managed via triggers (created_at, updated_at)
-- **Cascading deletes**: Relays automatically deleted when parent config is deleted
-- **Unique constraints**: Prevent duplicate relays per config, duplicate keys per mux
-- **GIN index**: Fast tag searches on proposer patterns using ANY operator
-- **Array type**: tags stored as TEXT[] in proposer patterns
 
 ## General Notes
 
@@ -194,6 +135,7 @@ When adding new routes:
    - Add handler paths to `paths(...)` section
    - Add request/response schemas to `components(schemas(...))` section
    - Add new tag if needed to `tags(...)` section
+   - Regenerate `openapi.json`: `UPDATE_OPENAPI=1 cargo test --test openapi_test` (any API change, not just new routes)
 
 2. **Tests** (`tests/`):
    - Add integration tests for new endpoints
@@ -202,4 +144,4 @@ When adding new routes:
 
 3. **Run checks**:
    - `cargo test` - all tests must pass
-   - `cargo sqlx prepare` - update offline query cache if new SQL queries added
+   - `cargo sqlx prepare -- --all-targets` - update offline query cache if new SQL queries added; CI and the clippy hook compile with `SQLX_OFFLINE=true`, so a missing entry fails there

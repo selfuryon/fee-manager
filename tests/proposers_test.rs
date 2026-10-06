@@ -47,11 +47,10 @@ struct ProposerListItem {
 
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
-struct PaginatedResponse<T> {
-    data: Vec<T>,
-    total: i64,
-    limit: i64,
-    offset: i64,
+struct ListResponse<T> {
+    items: Vec<T>,
+    #[allow(dead_code)]
+    next_cursor: Option<String>,
 }
 
 /// Helper to delete a proposer
@@ -326,9 +325,8 @@ async fn test_list_proposers() {
 
     assert_eq!(response.status(), 200);
 
-    let body: PaginatedResponse<ProposerListItem> =
-        response.json().await.expect("Failed to parse JSON");
-    assert_eq!(body.data.len(), 3);
+    let body: ListResponse<ProposerListItem> = response.json().await.expect("Failed to parse JSON");
+    assert_eq!(body.items.len(), 3);
 
     // Cleanup
     for pubkey in &pubkeys {
@@ -371,9 +369,9 @@ async fn test_filter_by_reset_relays() {
         .await
         .expect("Failed to send request");
 
-    let body: PaginatedResponse<ProposerListItem> = response.json().await.unwrap();
-    assert_eq!(body.data.len(), 2);
-    assert!(body.data.iter().all(|p| p.reset_relays));
+    let body: ListResponse<ProposerListItem> = response.json().await.unwrap();
+    assert_eq!(body.items.len(), 2);
+    assert!(body.items.iter().all(|p| p.reset_relays));
 
     // Filter reset_relays = false
     let response = app
@@ -386,9 +384,9 @@ async fn test_filter_by_reset_relays() {
         .await
         .expect("Failed to send request");
 
-    let body: PaginatedResponse<ProposerListItem> = response.json().await.unwrap();
-    assert_eq!(body.data.len(), 2);
-    assert!(body.data.iter().all(|p| !p.reset_relays));
+    let body: ListResponse<ProposerListItem> = response.json().await.unwrap();
+    assert_eq!(body.items.len(), 2);
+    assert!(body.items.iter().all(|p| !p.reset_relays));
 
     // Cleanup
     for pubkey in &pubkeys {
@@ -429,10 +427,10 @@ async fn test_filter_by_public_key_prefix() {
         .await
         .expect("Failed to send request");
 
-    let body: PaginatedResponse<ProposerListItem> = response.json().await.unwrap();
+    let body: ListResponse<ProposerListItem> = response.json().await.unwrap();
     // Filter matches both cc1 and cc2
     let matching: Vec<_> = body
-        .data
+        .items
         .iter()
         .filter(|p| {
             p.public_key.contains(&format!("cc1{}", id))
@@ -469,36 +467,21 @@ async fn test_proposers_pagination() {
             .expect("Failed to create proposer");
     }
 
-    // Test limit
-    let response = app
-        .client()
-        .get(format!(
-            "{}/api/admin/vouch/proposers?public_key=0xdead{}&limit=2",
-            app.address, prefix
-        ))
-        .send()
-        .await
-        .expect("Failed to send request");
-
-    let body: PaginatedResponse<ProposerListItem> = response.json().await.unwrap();
-    assert_eq!(body.data.len(), 2);
-    assert_eq!(body.limit, 2);
-    assert_eq!(body.total, 5);
-
-    // Test offset
-    let response = app
-        .client()
-        .get(format!(
-            "{}/api/admin/vouch/proposers?public_key=0xdead{}&limit=2&offset=3",
-            app.address, prefix
-        ))
-        .send()
-        .await
-        .expect("Failed to send request");
-
-    let body: PaginatedResponse<ProposerListItem> = response.json().await.unwrap();
-    assert_eq!(body.data.len(), 2);
-    assert_eq!(body.offset, 3);
+    // Walk the five proposers two at a time by following next_cursor
+    let (pages, keys) = app
+        .walk_pages(
+            &format!(
+                "{}/api/admin/vouch/proposers?public_key=0xdead{}&limit=2",
+                app.address, prefix
+            ),
+            "public_key",
+        )
+        .await;
+    assert_eq!(pages, vec![2, 2, 1]);
+    let mut sorted = keys.clone();
+    sorted.sort();
+    sorted.dedup();
+    assert_eq!(keys, sorted, "every proposer once, in key order");
 
     // Cleanup
     for pubkey in &pubkeys {
@@ -556,9 +539,9 @@ async fn test_filter_proposers_by_relay_url() {
         .expect("Failed to send request");
 
     assert_eq!(response.status(), 200);
-    let body: PaginatedResponse<ProposerListItem> = response.json().await.unwrap();
-    assert_eq!(body.data.len(), 1);
-    assert!(body.data[0].public_key.contains("01"));
+    let body: ListResponse<ProposerListItem> = response.json().await.unwrap();
+    assert_eq!(body.items.len(), 1);
+    assert!(body.items[0].public_key.contains("01"));
 
     // Cleanup
     delete_proposer(app, &pubkey_with_relay).await;
@@ -615,9 +598,9 @@ async fn test_filter_proposers_by_relay_min_value() {
         .expect("Failed to send request");
 
     assert_eq!(response.status(), 200);
-    let body: PaginatedResponse<ProposerListItem> = response.json().await.unwrap();
-    assert_eq!(body.data.len(), 1);
-    assert!(body.data[0].public_key.contains("01"));
+    let body: ListResponse<ProposerListItem> = response.json().await.unwrap();
+    assert_eq!(body.items.len(), 1);
+    assert!(body.items[0].public_key.contains("01"));
 
     // Cleanup
     delete_proposer(app, &pubkey_with_min).await;
@@ -675,9 +658,9 @@ async fn test_filter_proposers_by_relay_disabled() {
         .expect("Failed to send request");
 
     assert_eq!(response.status(), 200);
-    let body: PaginatedResponse<ProposerListItem> = response.json().await.unwrap();
-    assert_eq!(body.data.len(), 1);
-    assert!(body.data[0].public_key.contains("01"));
+    let body: ListResponse<ProposerListItem> = response.json().await.unwrap();
+    assert_eq!(body.items.len(), 1);
+    assert!(body.items[0].public_key.contains("01"));
 
     // Filter by relay_disabled=false
     let response = app
@@ -691,9 +674,9 @@ async fn test_filter_proposers_by_relay_disabled() {
         .expect("Failed to send request");
 
     assert_eq!(response.status(), 200);
-    let body: PaginatedResponse<ProposerListItem> = response.json().await.unwrap();
-    assert_eq!(body.data.len(), 1);
-    assert!(body.data[0].public_key.contains("02"));
+    let body: ListResponse<ProposerListItem> = response.json().await.unwrap();
+    assert_eq!(body.items.len(), 1);
+    assert!(body.items[0].public_key.contains("02"));
 
     // Cleanup
     delete_proposer(app, &pubkey_disabled).await;

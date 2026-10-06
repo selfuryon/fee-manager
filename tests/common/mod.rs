@@ -210,4 +210,37 @@ impl TestApp {
             .collect::<String>();
         format!("0xdead{:0>36}", hex_suffix)
     }
+
+    /// Walks an admin list endpoint by following `next_cursor` until it is
+    /// absent. `url` includes any filters and `limit`. Returns the size of
+    /// each page and the `key` field of every item, in order.
+    #[allow(dead_code)]
+    pub async fn walk_pages(&self, url: &str, key: &str) -> (Vec<usize>, Vec<String>) {
+        let (mut pages, mut keys, mut after) = (Vec::new(), Vec::new(), None::<String>);
+        loop {
+            let page_url = match &after {
+                Some(cursor) => format!(
+                    "{url}&after={}",
+                    url::form_urlencoded::byte_serialize(cursor.as_bytes()).collect::<String>()
+                ),
+                None => url.to_string(),
+            };
+            let response = self
+                .client()
+                .get(page_url)
+                .send()
+                .await
+                .expect("Failed to send request");
+            assert_eq!(response.status(), 200);
+            let body: serde_json::Value = response.json().await.unwrap();
+            let items = body["items"].as_array().unwrap();
+            pages.push(items.len());
+            keys.extend(items.iter().map(|i| i[key].as_str().unwrap().to_string()));
+            match body["next_cursor"].as_str() {
+                Some(cursor) => after = Some(cursor.to_string()),
+                None => return (pages, keys),
+            }
+            assert!(pages.len() < 1000, "walk did not terminate");
+        }
+    }
 }

@@ -752,3 +752,56 @@ async fn test_identical_requests_identical_bodies() {
     delete_pattern(app, &pattern).await;
     delete_config(app, &config_name).await;
 }
+
+// ============================================================================
+// Request body limit
+// ============================================================================
+
+#[tokio::test]
+async fn test_body_limit() {
+    let app = TestApp::get().await;
+    let config_name = unique_config_name("body");
+    create_config(app, &config_name).await;
+    let url = format!("{}/vouch/v2/execution-config/{}", app.address, config_name);
+
+    // 30,000 keys (~3 MB, above the old 2 MB default) are accepted
+    let keys: Vec<String> = (0..30_000u32).map(|i| format!("0x{:0>96x}", i)).collect();
+    let response = app
+        .client_unauthenticated()
+        .post(&url)
+        .json(&keys)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 200);
+
+    // Over 10 MB is rejected with the JSON error body
+    let big = format!("[\"{}\"]", "a".repeat(10 * 1024 * 1024 + 1));
+    let response = app
+        .client_unauthenticated()
+        .post(&url)
+        .header("content-type", "application/json")
+        .body(big)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 413);
+    let body: serde_json::Value = response.json().await.unwrap();
+    assert_eq!(body["error"]["code"], "PAYLOAD_TOO_LARGE");
+
+    // Admin routes keep the smaller default limit
+    let admin_body = format!("{{\"name\": \"{}\"}}", "a".repeat(3 * 1024 * 1024));
+    let response = app
+        .client()
+        .post(format!("{}/api/admin/vouch/configs/default", app.address))
+        .header("content-type", "application/json")
+        .body(admin_body)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 413);
+    let body: serde_json::Value = response.json().await.unwrap();
+    assert_eq!(body["error"]["code"], "PAYLOAD_TOO_LARGE");
+
+    delete_config(app, &config_name).await;
+}

@@ -6,9 +6,11 @@ pub mod audit;
 pub mod auth;
 pub mod config;
 pub mod errors;
+pub mod extract;
 pub mod handlers;
 pub mod models;
 pub mod openapi;
+pub mod pagination;
 pub mod schema;
 pub mod validation;
 

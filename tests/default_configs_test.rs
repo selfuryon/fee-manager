@@ -48,11 +48,10 @@ struct DefaultConfigListItem {
 }
 
 #[derive(Debug, Deserialize)]
-struct PaginatedResponse<T> {
-    data: Vec<T>,
-    total: i64,
-    limit: i64,
-    offset: i64,
+struct ListResponse<T> {
+    items: Vec<T>,
+    #[allow(dead_code)]
+    next_cursor: Option<String>,
 }
 
 /// Helper to create a unique test config name
@@ -186,7 +185,9 @@ async fn test_create_default_config_duplicate() {
         .await
         .expect("Failed to send request");
 
-    assert_eq!(response.status(), 400);
+    assert_eq!(response.status(), 409);
+    let body: serde_json::Value = response.json().await.unwrap();
+    assert_eq!(body["error"]["code"], "CONFLICT");
 
     delete_config(app, &name).await;
 }
@@ -378,9 +379,9 @@ async fn test_list_default_configs() {
 
     assert_eq!(response.status(), 200);
 
-    let body: PaginatedResponse<DefaultConfigListItem> =
+    let body: ListResponse<DefaultConfigListItem> =
         response.json().await.expect("Failed to parse JSON");
-    assert_eq!(body.data.len(), 3);
+    assert_eq!(body.items.len(), 3);
 
     // Cleanup
     for name in &names {
@@ -417,9 +418,9 @@ async fn test_filter_by_active() {
         .await
         .expect("Failed to send request");
 
-    let body: PaginatedResponse<DefaultConfigListItem> = response.json().await.unwrap();
-    assert_eq!(body.data.len(), 2);
-    assert!(body.data.iter().all(|c| c.active));
+    let body: ListResponse<DefaultConfigListItem> = response.json().await.unwrap();
+    assert_eq!(body.items.len(), 2);
+    assert!(body.items.iter().all(|c| c.active));
 
     // Filter inactive only
     let response = app
@@ -432,9 +433,9 @@ async fn test_filter_by_active() {
         .await
         .expect("Failed to send request");
 
-    let body: PaginatedResponse<DefaultConfigListItem> = response.json().await.unwrap();
-    assert_eq!(body.data.len(), 1);
-    assert!(body.data.iter().all(|c| !c.active));
+    let body: ListResponse<DefaultConfigListItem> = response.json().await.unwrap();
+    assert_eq!(body.items.len(), 1);
+    assert!(body.items.iter().all(|c| !c.active));
 
     // Cleanup
     for name in &names {
@@ -483,10 +484,10 @@ async fn test_filter_by_gas_limit() {
         .await
         .expect("Failed to send request");
 
-    let body: PaginatedResponse<DefaultConfigListItem> = response.json().await.unwrap();
-    assert_eq!(body.data.len(), 2);
+    let body: ListResponse<DefaultConfigListItem> = response.json().await.unwrap();
+    assert_eq!(body.items.len(), 2);
     assert!(
-        body.data
+        body.items
             .iter()
             .all(|c| c.gas_limit == Some("30000000".to_string()))
     );
@@ -515,36 +516,20 @@ async fn test_pagination() {
             .unwrap();
     }
 
-    // Test limit
-    let response = app
-        .client()
-        .get(format!(
-            "{}/api/admin/vouch/configs/default?name=test_page_{}&limit=2",
-            app.address, prefix
-        ))
-        .send()
-        .await
-        .expect("Failed to send request");
-
-    let body: PaginatedResponse<DefaultConfigListItem> = response.json().await.unwrap();
-    assert_eq!(body.data.len(), 2);
-    assert_eq!(body.limit, 2);
-    assert_eq!(body.total, 5);
-
-    // Test offset
-    let response = app
-        .client()
-        .get(format!(
-            "{}/api/admin/vouch/configs/default?name=test_page_{}&limit=2&offset=2",
-            app.address, prefix
-        ))
-        .send()
-        .await
-        .expect("Failed to send request");
-
-    let body: PaginatedResponse<DefaultConfigListItem> = response.json().await.unwrap();
-    assert_eq!(body.data.len(), 2);
-    assert_eq!(body.offset, 2);
+    // Walk the five configs two at a time by following next_cursor
+    let (pages, keys) = app
+        .walk_pages(
+            &format!(
+                "{}/api/admin/vouch/configs/default?name=test_page_{}&limit=2",
+                app.address, prefix
+            ),
+            "name",
+        )
+        .await;
+    assert_eq!(pages, vec![2, 2, 1]);
+    let mut expected = names.clone();
+    expected.sort();
+    assert_eq!(keys, expected, "every config once, in name order");
 
     // Cleanup
     for name in &names {
@@ -602,9 +587,9 @@ async fn test_filter_by_relay_url() {
         .expect("Failed to send request");
 
     assert_eq!(response.status(), 200);
-    let body: PaginatedResponse<DefaultConfigListItem> = response.json().await.unwrap();
-    assert_eq!(body.data.len(), 1);
-    assert!(body.data[0].name.contains("with"));
+    let body: ListResponse<DefaultConfigListItem> = response.json().await.unwrap();
+    assert_eq!(body.items.len(), 1);
+    assert!(body.items[0].name.contains("with"));
 
     // Cleanup
     delete_config(app, &name_with_relay).await;
@@ -663,9 +648,9 @@ async fn test_filter_by_relay_min_value() {
         .expect("Failed to send request");
 
     assert_eq!(response.status(), 200);
-    let body: PaginatedResponse<DefaultConfigListItem> = response.json().await.unwrap();
-    assert_eq!(body.data.len(), 1);
-    assert!(body.data[0].name.contains("with"));
+    let body: ListResponse<DefaultConfigListItem> = response.json().await.unwrap();
+    assert_eq!(body.items.len(), 1);
+    assert!(body.items[0].name.contains("with"));
 
     // Cleanup
     delete_config(app, &name_with_min).await;
@@ -842,7 +827,7 @@ async fn test_update_with_invalid_relay_keeps_existing_relays() {
     assert_eq!(relays.len(), 1);
     assert!(relays.contains_key("https://old.example.invalid/"));
 
-    // Only `active` sent: nothing else is validated or changed
+    // Only `active` sent: a valid full replacement that clears the rest
     let response = app
         .client()
         .put(&url)

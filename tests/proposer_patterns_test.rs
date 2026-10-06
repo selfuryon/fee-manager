@@ -49,11 +49,10 @@ struct ProposerPatternListItem {
 
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
-struct PaginatedResponse<T> {
-    data: Vec<T>,
-    total: i64,
-    limit: i64,
-    offset: i64,
+struct ListResponse<T> {
+    items: Vec<T>,
+    #[allow(dead_code)]
+    next_cursor: Option<String>,
 }
 
 /// Helper to create unique pattern name
@@ -172,7 +171,9 @@ async fn test_create_proposer_pattern_duplicate() {
         .await
         .expect("Failed to send request");
 
-    assert_eq!(response.status(), 400);
+    assert_eq!(response.status(), 409);
+    let body: serde_json::Value = response.json().await.unwrap();
+    assert_eq!(body["error"]["code"], "CONFLICT");
 
     delete_pattern(app, &name).await;
 }
@@ -357,9 +358,9 @@ async fn test_list_proposer_patterns() {
 
     assert_eq!(response.status(), 200);
 
-    let body: PaginatedResponse<ProposerPatternListItem> =
+    let body: ListResponse<ProposerPatternListItem> =
         response.json().await.expect("Failed to parse JSON");
-    assert_eq!(body.data.len(), 3);
+    assert_eq!(body.items.len(), 3);
 
     // Cleanup
     for name in &names {
@@ -421,10 +422,10 @@ async fn test_filter_by_tag() {
         .await
         .expect("Failed to send request");
 
-    let body: PaginatedResponse<ProposerPatternListItem> = response.json().await.unwrap();
-    assert_eq!(body.data.len(), 2);
+    let body: ListResponse<ProposerPatternListItem> = response.json().await.unwrap();
+    assert_eq!(body.items.len(), 2);
     assert!(
-        body.data
+        body.items
             .iter()
             .all(|p| p.tags.contains(&"lido".to_string()))
     );
@@ -440,8 +441,8 @@ async fn test_filter_by_tag() {
         .await
         .expect("Failed to send request");
 
-    let body: PaginatedResponse<ProposerPatternListItem> = response.json().await.unwrap();
-    assert_eq!(body.data.len(), 1);
+    let body: ListResponse<ProposerPatternListItem> = response.json().await.unwrap();
+    assert_eq!(body.items.len(), 1);
 
     // Cleanup
     delete_pattern(app, &name1).await;
@@ -489,9 +490,9 @@ async fn test_filter_by_pattern() {
         .await
         .expect("Failed to send request");
 
-    let body: PaginatedResponse<ProposerPatternListItem> = response.json().await.unwrap();
-    assert_eq!(body.data.len(), 1);
-    assert!(body.data[0].pattern.contains("0x8"));
+    let body: ListResponse<ProposerPatternListItem> = response.json().await.unwrap();
+    assert_eq!(body.items.len(), 1);
+    assert!(body.items[0].pattern.contains("0x8"));
 
     // Cleanup
     delete_pattern(app, &name1).await;
@@ -531,9 +532,9 @@ async fn test_filter_by_reset_relays() {
         .await
         .expect("Failed to send request");
 
-    let body: PaginatedResponse<ProposerPatternListItem> = response.json().await.unwrap();
-    assert_eq!(body.data.len(), 2);
-    assert!(body.data.iter().all(|p| p.reset_relays));
+    let body: ListResponse<ProposerPatternListItem> = response.json().await.unwrap();
+    assert_eq!(body.items.len(), 2);
+    assert!(body.items.iter().all(|p| p.reset_relays));
 
     // Cleanup
     for name in &names {
@@ -560,35 +561,20 @@ async fn test_proposer_patterns_pagination() {
             .expect("Failed to create pattern");
     }
 
-    // Test limit
-    let response = app
-        .client()
-        .get(format!(
-            "{}/api/admin/vouch/proposer-patterns?name=test_page_{}&limit=2",
-            app.address, id
-        ))
-        .send()
-        .await
-        .expect("Failed to send request");
-
-    let body: PaginatedResponse<ProposerPatternListItem> = response.json().await.unwrap();
-    assert_eq!(body.data.len(), 2);
-    assert_eq!(body.total, 5);
-
-    // Test offset
-    let response = app
-        .client()
-        .get(format!(
-            "{}/api/admin/vouch/proposer-patterns?name=test_page_{}&limit=2&offset=3",
-            app.address, id
-        ))
-        .send()
-        .await
-        .expect("Failed to send request");
-
-    let body: PaginatedResponse<ProposerPatternListItem> = response.json().await.unwrap();
-    assert_eq!(body.data.len(), 2);
-    assert_eq!(body.offset, 3);
+    // Walk the five patterns two at a time by following next_cursor
+    let (pages, keys) = app
+        .walk_pages(
+            &format!(
+                "{}/api/admin/vouch/proposer-patterns?name=test_page_{}&limit=2",
+                app.address, id
+            ),
+            "name",
+        )
+        .await;
+    assert_eq!(pages, vec![2, 2, 1]);
+    let mut expected = names.clone();
+    expected.sort();
+    assert_eq!(keys, expected, "every pattern once, in name order");
 
     // Cleanup
     for name in &names {
@@ -646,9 +632,9 @@ async fn test_filter_patterns_by_relay_url() {
         .expect("Failed to send request");
 
     assert_eq!(response.status(), 200);
-    let body: PaginatedResponse<ProposerPatternListItem> = response.json().await.unwrap();
-    assert_eq!(body.data.len(), 1);
-    assert!(body.data[0].name.contains("with"));
+    let body: ListResponse<ProposerPatternListItem> = response.json().await.unwrap();
+    assert_eq!(body.items.len(), 1);
+    assert!(body.items[0].name.contains("with"));
 
     // Cleanup
     delete_pattern(app, &name_with_relay).await;
@@ -707,9 +693,9 @@ async fn test_filter_patterns_by_relay_min_value() {
         .expect("Failed to send request");
 
     assert_eq!(response.status(), 200);
-    let body: PaginatedResponse<ProposerPatternListItem> = response.json().await.unwrap();
-    assert_eq!(body.data.len(), 1);
-    assert!(body.data[0].name.contains("with"));
+    let body: ListResponse<ProposerPatternListItem> = response.json().await.unwrap();
+    assert_eq!(body.items.len(), 1);
+    assert!(body.items[0].name.contains("with"));
 
     // Cleanup
     delete_pattern(app, &name_with_min).await;
@@ -769,9 +755,9 @@ async fn test_filter_patterns_by_relay_disabled() {
         .expect("Failed to send request");
 
     assert_eq!(response.status(), 200);
-    let body: PaginatedResponse<ProposerPatternListItem> = response.json().await.unwrap();
-    assert_eq!(body.data.len(), 1);
-    assert!(body.data[0].name.contains("disabled"));
+    let body: ListResponse<ProposerPatternListItem> = response.json().await.unwrap();
+    assert_eq!(body.items.len(), 1);
+    assert!(body.items[0].name.contains("disabled"));
 
     // Filter by relay_disabled=false
     let response = app
@@ -785,9 +771,9 @@ async fn test_filter_patterns_by_relay_disabled() {
         .expect("Failed to send request");
 
     assert_eq!(response.status(), 200);
-    let body: PaginatedResponse<ProposerPatternListItem> = response.json().await.unwrap();
-    assert_eq!(body.data.len(), 1);
-    assert!(body.data[0].name.contains("enabled"));
+    let body: ListResponse<ProposerPatternListItem> = response.json().await.unwrap();
+    assert_eq!(body.items.len(), 1);
+    assert!(body.items[0].name.contains("enabled"));
 
     // Cleanup
     delete_pattern(app, &name_disabled).await;
@@ -872,6 +858,31 @@ async fn test_pattern_validation() {
         .await
         .unwrap();
     assert_eq!(stored.pattern, "^pool/.*$");
+
+    delete_pattern(app, &name).await;
+}
+
+#[tokio::test]
+async fn test_concurrent_creates_one_wins() {
+    let app = TestApp::get().await;
+    let name = unique_pattern_name("race");
+    let create = |name: String| async move {
+        app.client()
+            .post(format!("{}/api/admin/vouch/proposer-patterns", app.address))
+            .json(&json!({"name": name, "pattern": "^race/.*$"}))
+            .send()
+            .await
+            .unwrap()
+            .status()
+            .as_u16()
+    };
+    let (a, b) = tokio::join!(
+        tokio::spawn(create(name.clone())),
+        tokio::spawn(create(name.clone()))
+    );
+    let mut statuses = [a.unwrap(), b.unwrap()];
+    statuses.sort();
+    assert_eq!(statuses, [201, 409]);
 
     delete_pattern(app, &name).await;
 }

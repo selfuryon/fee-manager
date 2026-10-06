@@ -1,10 +1,11 @@
 // Token CRUD handlers
 
+use crate::extract::{AppJson, AppPath};
 use std::sync::Arc;
 
 use axum::{
     Json, Router,
-    extract::{Path, State},
+    extract::State,
     routing::{delete, get},
 };
 use serde::{Deserialize, Serialize};
@@ -77,7 +78,7 @@ pub async fn list_tokens(
 pub async fn create_token(
     State(state): State<Arc<AppState>>,
     ctx: RequestContext,
-    Json(request): Json<CreateTokenRequest>,
+    AppJson(request): AppJson<CreateTokenRequest>,
 ) -> Result<Json<CreateTokenResponse>, ApiError> {
     let (token, plaintext) =
         service::create_token(&state.pool, &request.name, request.description.as_deref()).await?;
@@ -123,7 +124,7 @@ pub async fn create_token(
 pub async fn delete_token(
     State(state): State<Arc<AppState>>,
     ctx: RequestContext,
-    Path(id): Path<Uuid>,
+    AppPath(id): AppPath<Uuid>,
 ) -> Result<axum::http::StatusCode, ApiError> {
     let deleted = service::delete_token(&state.pool, id).await?;
 

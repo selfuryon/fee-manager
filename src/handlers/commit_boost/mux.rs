@@ -4,31 +4,26 @@ use crate::addresses::BlsPubkey;
 use crate::audit::{AuditAction, AuditChanges, RequestContext, ResourceType};
 use crate::audit_log;
 use crate::errors::ApiError;
+use crate::extract::{AppJson, AppPath, AppQuery};
+use crate::pagination::{ListResponse, check_limit};
 use crate::schema::{
     CreateMuxConfigRequest, MuxConfigListItem, MuxConfigResponse, MuxKeysRequest, MuxKeysResponse,
-    PaginatedResponse, UpdateMuxConfigRequest,
+    UpdateMuxConfigRequest,
 };
-use axum::{
-    Json,
-    extract::{Path, Query, State},
-    http::StatusCode,
-    response::IntoResponse,
-};
+use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
 use serde::Deserialize;
 use std::sync::Arc;
 use tracing::{info, instrument};
 use utoipa::IntoParams;
 
 #[derive(Debug, Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
 pub struct MuxConfigFilters {
-    #[serde(default = "default_limit")]
+    /// Maximum number of items to return (1-1000, default 100)
+    #[serde(default = "crate::pagination::default_limit")]
     pub limit: i64,
-    #[serde(default)]
-    pub offset: i64,
-}
-
-fn default_limit() -> i64 {
-    100
+    /// Opaque cursor: the `next_cursor` of the previous page
+    pub after: Option<String>,
 }
 
 // ============================================================================
@@ -50,7 +45,7 @@ fn default_limit() -> i64 {
 #[instrument(skip(state))]
 pub async fn get_mux_keys_public(
     State(state): State<Arc<AppState>>,
-    Path(name): Path<String>,
+    AppPath(name): AppPath<String>,
 ) -> Result<Json<Vec<BlsPubkey>>, ApiError> {
     info!("Getting mux keys (public): {}", name);
 
@@ -88,7 +83,7 @@ pub async fn get_mux_keys_public(
     path = "/api/admin/commit-boost/mux",
     params(MuxConfigFilters),
     responses(
-        (status = 200, description = "List of mux configs", body = PaginatedResponse<MuxConfigListItem>)
+        (status = 200, description = "List of mux configs", body = ListResponse<MuxConfigListItem>)
     ),
     tag = "Commit-Boost - Mux",
     security(("bearer_auth" = []))
@@ -96,22 +91,21 @@ pub async fn get_mux_keys_public(
 #[instrument(skip(state))]
 pub async fn list_mux_configs(
     State(state): State<Arc<AppState>>,
-    Query(filters): Query<MuxConfigFilters>,
-) -> Result<Json<PaginatedResponse<MuxConfigListItem>>, ApiError> {
+    AppQuery(filters): AppQuery<MuxConfigFilters>,
+) -> Result<Json<ListResponse<MuxConfigListItem>>, ApiError> {
     info!("Listing mux configs");
 
-    let total: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM commit_boost_mux_configs")
-        .fetch_one(&state.pool)
-        .await?;
+    check_limit(filters.limit)?;
 
     let configs = sqlx::query_as::<_, crate::models::CommitBoostMuxConfig>(
         "SELECT name, created_at, updated_at
          FROM commit_boost_mux_configs
-         ORDER BY name ASC
-         LIMIT $1 OFFSET $2",
+         WHERE $2::text IS NULL OR name > $2
+         ORDER BY name
+         LIMIT $1",
     )
     .bind(filters.limit)
-    .bind(filters.offset)
+    .bind(&filters.after)
     .fetch_all(&state.pool)
     .await?;
 
@@ -131,12 +125,9 @@ pub async fn list_mux_configs(
         });
     }
 
-    Ok(Json(PaginatedResponse {
-        data,
-        total,
-        limit: filters.limit,
-        offset: filters.offset,
-    }))
+    Ok(Json(ListResponse::new(data, filters.limit, |item| {
+        item.name.clone()
+    })))
 }
 
 #[utoipa::path(
@@ -155,7 +146,7 @@ pub async fn list_mux_configs(
 #[instrument(skip(state))]
 pub async fn get_mux_config(
     State(state): State<Arc<AppState>>,
-    Path(name): Path<String>,
+    AppPath(name): AppPath<String>,
 ) -> Result<Json<MuxConfigResponse>, ApiError> {
     info!("Getting mux config: {}", name);
 
@@ -197,7 +188,7 @@ pub async fn get_mux_config(
 pub async fn create_mux_config(
     State(state): State<Arc<AppState>>,
     ctx: RequestContext,
-    Json(req): Json<CreateMuxConfigRequest>,
+    AppJson(req): AppJson<CreateMuxConfigRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
     info!("Creating mux config: {}", req.name);
 
@@ -212,7 +203,7 @@ pub async fn create_mux_config(
     .await?;
 
     if existing > 0 {
-        return Err(ApiError::InvalidData(format!(
+        return Err(ApiError::Conflict(format!(
             "Mux config '{}' already exists",
             req.name
         )));
@@ -283,8 +274,8 @@ pub async fn create_mux_config(
 pub async fn update_mux_config(
     State(state): State<Arc<AppState>>,
     ctx: RequestContext,
-    Path(name): Path<String>,
-    Json(req): Json<UpdateMuxConfigRequest>,
+    AppPath(name): AppPath<String>,
+    AppJson(req): AppJson<UpdateMuxConfigRequest>,
 ) -> Result<Json<MuxConfigResponse>, ApiError> {
     info!("Updating mux config: {}", name);
 
@@ -374,7 +365,7 @@ pub async fn update_mux_config(
 pub async fn delete_mux_config(
     State(state): State<Arc<AppState>>,
     ctx: RequestContext,
-    Path(name): Path<String>,
+    AppPath(name): AppPath<String>,
 ) -> Result<impl IntoResponse, ApiError> {
     info!("Deleting mux config: {}", name);
 
@@ -421,8 +412,8 @@ pub async fn delete_mux_config(
 pub async fn add_mux_keys(
     State(state): State<Arc<AppState>>,
     ctx: RequestContext,
-    Path(name): Path<String>,
-    Json(req): Json<MuxKeysRequest>,
+    AppPath(name): AppPath<String>,
+    AppJson(req): AppJson<MuxKeysRequest>,
 ) -> Result<Json<MuxKeysResponse>, ApiError> {
     info!("Adding keys to mux config: {}", name);
 
@@ -511,8 +502,8 @@ pub async fn add_mux_keys(
 pub async fn remove_mux_keys(
     State(state): State<Arc<AppState>>,
     ctx: RequestContext,
-    Path(name): Path<String>,
-    Json(req): Json<MuxKeysRequest>,
+    AppPath(name): AppPath<String>,
+    AppJson(req): AppJson<MuxKeysRequest>,
 ) -> Result<Json<MuxKeysResponse>, ApiError> {
     info!("Removing keys from mux config: {}", name);
 

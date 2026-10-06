@@ -111,6 +111,12 @@ All management endpoints live under `/api/admin/vouch/*` and `/api/admin/commit-
 
 7. **Rich filtering**: All list endpoints support filtering via query parameters for all fields (string prefix/exact match, numeric exact match, boolean true/false, tags array contains)
 
+8. **Keyset pagination**: lists take `limit` + `after` and return `{items, next_cursor}` (`src/pagination.rs`), ordered by primary key — same contract as kleido. No offset, no total.
+
+9. **PUT replaces**: every `PUT` is a full replacement; omitted fields are cleared. Don't reintroduce `COALESCE`-style partial updates.
+
+10. **Extractors**: handlers use `AppJson`/`AppQuery`/`AppPath` (`src/extract.rs`), never Axum's `Json`/`Query`/`Path` for input — the wrappers turn rejections into the JSON error body. `IntoParams` structs need `#[into_params(parameter_in = Query)]`, since utoipa can no longer infer it.
+
 ## Testing with Vouch
 
 ```bash

@@ -1,18 +1,15 @@
 // handlers/vouch/proposers.rs - Proposer CRUD handlers
 use crate::AppState;
+use crate::addresses::BlsPubkey;
 use crate::audit::{AuditAction, AuditChanges, RequestContext, ResourceType};
 use crate::audit_log;
 use crate::errors::ApiError;
+use crate::extract::{AppJson, AppPath, AppQuery};
+use crate::pagination::{ListResponse, check_limit};
 use crate::schema::{
-    CreateOrUpdateProposerRequest, PaginatedResponse, ProposerListItem, ProposerRelayConfig,
-    ProposerResponse,
+    CreateOrUpdateProposerRequest, ProposerListItem, ProposerRelayConfig, ProposerResponse,
 };
-use axum::{
-    Json,
-    extract::{Path, Query, State},
-    http::StatusCode,
-    response::IntoResponse,
-};
+use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
 use serde::Deserialize;
 use sqlx::{Postgres, QueryBuilder};
 use std::collections::HashMap;
@@ -21,6 +18,7 @@ use tracing::{info, instrument};
 use utoipa::IntoParams;
 
 #[derive(Debug, Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
 pub struct ProposerFilters {
     pub public_key: Option<String>,
     pub fee_recipient: Option<String>,
@@ -33,14 +31,11 @@ pub struct ProposerFilters {
     pub relay_min_value: Option<String>,
     /// Filter by relay disabled status
     pub relay_disabled: Option<bool>,
-    #[serde(default = "default_limit")]
+    /// Maximum number of items to return (1-1000, default 100)
+    #[serde(default = "crate::pagination::default_limit")]
     pub limit: i64,
-    #[serde(default)]
-    pub offset: i64,
-}
-
-fn default_limit() -> i64 {
-    100
+    /// Opaque cursor: the `next_cursor` of the previous page
+    pub after: Option<String>,
 }
 
 /// Appends the WHERE clause for `filters`; every value is a bind parameter.
@@ -85,7 +80,7 @@ fn push_filters(qb: &mut QueryBuilder<Postgres>, filters: &ProposerFilters) {
     path = "/api/admin/vouch/proposers",
     params(ProposerFilters),
     responses(
-        (status = 200, description = "List of proposers", body = PaginatedResponse<ProposerListItem>)
+        (status = 200, description = "List of proposers", body = ListResponse<ProposerListItem>)
     ),
     tag = "Vouch - Proposers",
     security(("bearer_auth" = []))
@@ -93,27 +88,25 @@ fn push_filters(qb: &mut QueryBuilder<Postgres>, filters: &ProposerFilters) {
 #[instrument(skip(state))]
 pub async fn list_proposers(
     State(state): State<Arc<AppState>>,
-    Query(filters): Query<ProposerFilters>,
-) -> Result<Json<PaginatedResponse<ProposerListItem>>, ApiError> {
+    AppQuery(filters): AppQuery<ProposerFilters>,
+) -> Result<Json<ListResponse<ProposerListItem>>, ApiError> {
     info!("Listing proposers with filters: {:?}", filters);
 
-    let mut count_query = QueryBuilder::new("SELECT COUNT(*) FROM vouch_proposers p");
-    push_filters(&mut count_query, &filters);
-    let total: i64 = count_query
-        .build_query_scalar()
-        .fetch_one(&state.pool)
-        .await?;
+    check_limit(filters.limit)?;
 
     let mut data_query = QueryBuilder::new(
         "SELECT p.public_key, p.fee_recipient, p.gas_limit, p.min_value, p.reset_relays, p.created_at, p.updated_at
          FROM vouch_proposers p",
     );
     push_filters(&mut data_query, &filters);
+    if let Some(ref after) = filters.after {
+        data_query
+            .push(" AND p.public_key > ")
+            .push_bind(after.clone());
+    }
     data_query
-        .push(" ORDER BY p.created_at DESC LIMIT ")
-        .push_bind(filters.limit)
-        .push(" OFFSET ")
-        .push_bind(filters.offset);
+        .push(" ORDER BY p.public_key LIMIT ")
+        .push_bind(filters.limit);
 
     let proposers = data_query
         .build_query_as::<crate::models::VouchProposer>()
@@ -153,12 +146,9 @@ pub async fn list_proposers(
         })
         .collect();
 
-    Ok(Json(PaginatedResponse {
-        data,
-        total,
-        limit: filters.limit,
-        offset: filters.offset,
-    }))
+    Ok(Json(ListResponse::new(data, filters.limit, |item| {
+        item.public_key.to_string()
+    })))
 }
 
 #[utoipa::path(
@@ -177,7 +167,7 @@ pub async fn list_proposers(
 #[instrument(skip(state))]
 pub async fn get_proposer(
     State(state): State<Arc<AppState>>,
-    Path(public_key): Path<String>,
+    AppPath(public_key): AppPath<BlsPubkey>,
 ) -> Result<Json<ProposerResponse>, ApiError> {
     info!("Getting proposer: {}", public_key);
 
@@ -238,8 +228,8 @@ pub async fn get_proposer(
 pub async fn create_or_update_proposer(
     State(state): State<Arc<AppState>>,
     ctx: RequestContext,
-    Path(public_key): Path<String>,
-    Json(req): Json<CreateOrUpdateProposerRequest>,
+    AppPath(public_key): AppPath<BlsPubkey>,
+    AppJson(req): AppJson<CreateOrUpdateProposerRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
     info!("Creating/updating proposer: {}", public_key);
 
@@ -329,7 +319,7 @@ pub async fn create_or_update_proposer(
             ctx,
             action,
             ResourceType::VouchProposer,
-            &public_key,
+            public_key.to_string(),
             changes
         );
     }
@@ -395,7 +385,7 @@ pub async fn create_or_update_proposer(
 pub async fn delete_proposer(
     State(state): State<Arc<AppState>>,
     ctx: RequestContext,
-    Path(public_key): Path<String>,
+    AppPath(public_key): AppPath<BlsPubkey>,
 ) -> Result<impl IntoResponse, ApiError> {
     info!("Deleting proposer: {}", public_key);
 
@@ -417,7 +407,7 @@ pub async fn delete_proposer(
             ctx,
             AuditAction::Delete,
             ResourceType::VouchProposer,
-            &public_key
+            public_key.to_string()
         );
     }
 

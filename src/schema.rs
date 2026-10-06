@@ -46,14 +46,6 @@ pub struct ProposerRelayConfig {
     pub disabled: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
-pub struct PaginatedResponse<T> {
-    pub data: Vec<T>,
-    pub total: i64,
-    pub limit: i64,
-    pub offset: i64,
-}
-
 // ============================================================================
 // Vouch - Default Configs API
 // ============================================================================
@@ -106,6 +98,7 @@ pub struct CreateDefaultConfigRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+/// Full replacement: omitted optional fields and relays are cleared
 pub struct UpdateDefaultConfigRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fee_recipient: Option<EthAddress>,
@@ -113,8 +106,8 @@ pub struct UpdateDefaultConfigRequest {
     pub gas_limit: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub min_value: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub active: Option<bool>,
+    #[serde(default = "default_true")]
+    pub active: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub relays: Option<HashMap<String, RelayConfig>>,
 }
@@ -230,19 +223,19 @@ pub struct CreateProposerPatternRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+/// Full replacement: omitted optional fields, tags and relays are cleared
 pub struct UpdateProposerPatternRequest {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub pattern: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tags: Option<Vec<String>>,
+    pub pattern: String,
+    #[serde(default)]
+    pub tags: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fee_recipient: Option<EthAddress>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gas_limit: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub min_value: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub reset_relays: Option<bool>,
+    #[serde(default)]
+    pub reset_relays: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub relays: Option<HashMap<String, ProposerRelayConfig>>,
 }

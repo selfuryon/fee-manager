@@ -2,9 +2,13 @@
 use crate::AppState;
 use axum::{
     Router,
+    extract::DefaultBodyLimit,
     routing::{get, post},
 };
 use std::sync::Arc;
+
+/// Body limit of the execution-config endpoint
+pub const EXECUTION_CONFIG_BODY_LIMIT: usize = 10 * 1024 * 1024;
 
 pub mod default_configs;
 pub mod execution_config;
@@ -13,10 +17,14 @@ pub mod proposers;
 
 /// Public routes for Vouch (no authentication)
 pub fn public_routes() -> Router<Arc<AppState>> {
-    Router::new().route(
-        "/v2/execution-config/{config}",
-        post(execution_config::get_execution_config),
-    )
+    Router::new()
+        .route(
+            "/v2/execution-config/{config}",
+            post(execution_config::get_execution_config),
+        )
+        // Vouch sends all of its keys in one request: ~101 bytes per key, so
+        // 10 MB is about 100k keys. Admin routes keep the 2 MB default.
+        .layer(DefaultBodyLimit::max(EXECUTION_CONFIG_BODY_LIMIT))
 }
 
 /// Admin routes for Vouch (authentication required)

@@ -3,16 +3,13 @@ use crate::AppState;
 use crate::audit::{AuditAction, AuditChanges, RequestContext, ResourceType};
 use crate::audit_log;
 use crate::errors::ApiError;
+use crate::extract::{AppJson, AppPath, AppQuery};
+use crate::pagination::{ListResponse, check_limit};
 use crate::schema::{
-    CreateDefaultConfigRequest, DefaultConfigListItem, DefaultConfigResponse, PaginatedResponse,
-    RelayConfig, UpdateDefaultConfigRequest,
+    CreateDefaultConfigRequest, DefaultConfigListItem, DefaultConfigResponse, RelayConfig,
+    UpdateDefaultConfigRequest,
 };
-use axum::{
-    Json,
-    extract::{Path, Query, State},
-    http::StatusCode,
-    response::IntoResponse,
-};
+use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
 use serde::Deserialize;
 use sqlx::{Postgres, QueryBuilder};
 use std::collections::HashMap;
@@ -21,6 +18,7 @@ use tracing::{info, instrument};
 use utoipa::IntoParams;
 
 #[derive(Debug, Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
 pub struct DefaultConfigFilters {
     pub name: Option<String>,
     pub fee_recipient: Option<String>,
@@ -31,14 +29,11 @@ pub struct DefaultConfigFilters {
     pub relay_url: Option<String>,
     /// Filter by relay min_value (exact match)
     pub relay_min_value: Option<String>,
-    #[serde(default = "default_limit")]
+    /// Maximum number of items to return (1-1000, default 100)
+    #[serde(default = "crate::pagination::default_limit")]
     pub limit: i64,
-    #[serde(default)]
-    pub offset: i64,
-}
-
-fn default_limit() -> i64 {
-    100
+    /// Opaque cursor: the `next_cursor` of the previous page
+    pub after: Option<String>,
 }
 
 /// Appends the WHERE clause for `filters`; every value is a bind parameter.
@@ -77,7 +72,7 @@ fn push_filters(qb: &mut QueryBuilder<Postgres>, filters: &DefaultConfigFilters)
     path = "/api/admin/vouch/configs/default",
     params(DefaultConfigFilters),
     responses(
-        (status = 200, description = "List of default configs", body = PaginatedResponse<DefaultConfigListItem>)
+        (status = 200, description = "List of default configs", body = ListResponse<DefaultConfigListItem>)
     ),
     tag = "Vouch - Default Configs",
     security(("bearer_auth" = []))
@@ -85,27 +80,23 @@ fn push_filters(qb: &mut QueryBuilder<Postgres>, filters: &DefaultConfigFilters)
 #[instrument(skip(state))]
 pub async fn list_default_configs(
     State(state): State<Arc<AppState>>,
-    Query(filters): Query<DefaultConfigFilters>,
-) -> Result<Json<PaginatedResponse<DefaultConfigListItem>>, ApiError> {
+    AppQuery(filters): AppQuery<DefaultConfigFilters>,
+) -> Result<Json<ListResponse<DefaultConfigListItem>>, ApiError> {
     info!("Listing default configs with filters: {:?}", filters);
 
-    let mut count_query = QueryBuilder::new("SELECT COUNT(*) FROM vouch_default_configs c");
-    push_filters(&mut count_query, &filters);
-    let total: i64 = count_query
-        .build_query_scalar()
-        .fetch_one(&state.pool)
-        .await?;
+    check_limit(filters.limit)?;
 
     let mut data_query = QueryBuilder::new(
         "SELECT c.name, c.fee_recipient, c.gas_limit, c.min_value, c.active, c.created_at, c.updated_at
          FROM vouch_default_configs c",
     );
     push_filters(&mut data_query, &filters);
+    if let Some(ref after) = filters.after {
+        data_query.push(" AND c.name > ").push_bind(after.clone());
+    }
     data_query
-        .push(" ORDER BY c.name ASC LIMIT ")
-        .push_bind(filters.limit)
-        .push(" OFFSET ")
-        .push_bind(filters.offset);
+        .push(" ORDER BY c.name LIMIT ")
+        .push_bind(filters.limit);
 
     let configs = data_query
         .build_query_as::<crate::models::VouchDefaultConfig>()
@@ -145,12 +136,9 @@ pub async fn list_default_configs(
         })
         .collect();
 
-    Ok(Json(PaginatedResponse {
-        data,
-        total,
-        limit: filters.limit,
-        offset: filters.offset,
-    }))
+    Ok(Json(ListResponse::new(data, filters.limit, |item| {
+        item.name.to_string()
+    })))
 }
 
 #[utoipa::path(
@@ -169,7 +157,7 @@ pub async fn list_default_configs(
 #[instrument(skip(state))]
 pub async fn get_default_config(
     State(state): State<Arc<AppState>>,
-    Path(name): Path<String>,
+    AppPath(name): AppPath<String>,
 ) -> Result<Json<DefaultConfigResponse>, ApiError> {
     info!("Getting default config: {}", name);
 
@@ -227,7 +215,7 @@ pub async fn get_default_config(
 pub async fn create_default_config(
     State(state): State<Arc<AppState>>,
     ctx: RequestContext,
-    Json(req): Json<CreateDefaultConfigRequest>,
+    AppJson(req): AppJson<CreateDefaultConfigRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
     info!("Creating default config: {}", req.name);
 
@@ -243,7 +231,7 @@ pub async fn create_default_config(
             .await?;
 
     if existing > 0 {
-        return Err(ApiError::InvalidData(format!(
+        return Err(ApiError::Conflict(format!(
             "Config '{}' already exists",
             req.name
         )));
@@ -359,8 +347,8 @@ pub async fn create_default_config(
 pub async fn update_default_config(
     State(state): State<Arc<AppState>>,
     ctx: RequestContext,
-    Path(name): Path<String>,
-    Json(req): Json<UpdateDefaultConfigRequest>,
+    AppPath(name): AppPath<String>,
+    AppJson(req): AppJson<UpdateDefaultConfigRequest>,
 ) -> Result<Json<DefaultConfigResponse>, ApiError> {
     info!("Updating default config: {}", name);
 
@@ -382,37 +370,27 @@ pub async fn update_default_config(
         )));
     }
 
-    // Omitted fields keep their current value
-    let has_updates = req.fee_recipient.is_some()
-        || req.gas_limit.is_some()
-        || req.min_value.is_some()
-        || req.active.is_some();
+    // Full replacement: every column comes from the request, and the relay
+    // set is replaced by the request's (none when omitted)
+    sqlx::query(
+        "UPDATE vouch_default_configs
+         SET fee_recipient = $2, gas_limit = $3, min_value = $4, active = $5
+         WHERE name = $1",
+    )
+    .bind(&name)
+    .bind(&req.fee_recipient)
+    .bind(&req.gas_limit)
+    .bind(&req.min_value)
+    .bind(req.active)
+    .execute(&mut *tx)
+    .await?;
 
-    if has_updates {
-        sqlx::query(
-            "UPDATE vouch_default_configs SET
-                fee_recipient = COALESCE($2, fee_recipient),
-                gas_limit = COALESCE($3, gas_limit),
-                min_value = COALESCE($4, min_value),
-                active = COALESCE($5, active)
-             WHERE name = $1",
-        )
+    sqlx::query("DELETE FROM vouch_default_relays WHERE config_name = $1")
         .bind(&name)
-        .bind(&req.fee_recipient)
-        .bind(&req.gas_limit)
-        .bind(&req.min_value)
-        .bind(req.active)
         .execute(&mut *tx)
         .await?;
-    }
 
-    // Handle relays if provided
     if let Some(relays) = &req.relays {
-        sqlx::query("DELETE FROM vouch_default_relays WHERE config_name = $1")
-            .bind(&name)
-            .execute(&mut *tx)
-            .await?;
-
         for (url, relay) in relays {
             sqlx::query(
                 "INSERT INTO vouch_default_relays
@@ -438,7 +416,7 @@ pub async fn update_default_config(
             fee_recipient: req.fee_recipient.as_ref().map(|a| a.to_string()),
             min_value: req.min_value.clone(),
             gas_limit: req.gas_limit.clone(),
-            active: req.active,
+            active: Some(req.active),
             relays_count: req.relays.as_ref().map(|r| r.len()),
             ..Default::default()
         };
@@ -506,7 +484,7 @@ pub async fn update_default_config(
 pub async fn delete_default_config(
     State(state): State<Arc<AppState>>,
     ctx: RequestContext,
-    Path(name): Path<String>,
+    AppPath(name): AppPath<String>,
 ) -> Result<impl IntoResponse, ApiError> {
     info!("Deleting default config: {}", name);
 

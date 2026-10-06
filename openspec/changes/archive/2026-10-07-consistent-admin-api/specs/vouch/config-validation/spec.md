@@ -1,10 +1,6 @@
-# vouch/config-validation Specification
+# Spec Delta
 
-## Purpose
-
-Keeps values that Vouch cannot use out of the configuration: the admin API refuses an invalid gas limit, minimum value, relay URL or proposer pattern at write time, so the public execution config only ever serves values that were valid when stored.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Validated fields
 The admin API SHALL validate the following fields wherever they appear in a create or update request for a default config, a proposer or a proposer pattern, including inside each entry of a `relays` map:
@@ -56,28 +52,3 @@ A field that is omitted or `null` SHALL NOT be validated; validation applies onl
 - **WHEN** an admin creates a default config sending only `name` and `active`
 - **THEN** the response is `201` and `gas_limit`, `min_value` and `relays` are absent from the stored config
 
-### Requirement: Rejection response
-A request that fails validation SHALL be rejected as a whole with status `400` and the error body `{"error": {"code": "INVALID_DATA", "message": ...}}`, where the message names the offending field and, for a relay, the relay URL it belongs to. A rejected request SHALL NOT change any stored data.
-
-#### Scenario: Message names the field
-- **WHEN** an admin creates a default config with `min_value` `"cheap"`
-- **THEN** the response body has `error.code` `"INVALID_DATA"` and an `error.message` that contains `min_value`
-
-#### Scenario: Message names the relay
-- **WHEN** an admin creates a default config whose relay at `"https://relay.example.invalid/"` has `min_value` `"cheap"`
-- **THEN** the `error.message` contains both `min_value` and `https://relay.example.invalid/`
-
-#### Scenario: Update with an invalid relay leaves existing relays intact
-- **WHEN** an admin updates a default config that has relays, sending a new `relays` map that contains one invalid entry
-- **THEN** the response is `400` and the stored relays are the same as before the request
-
-### Requirement: Values stored as sent
-A value that passes validation SHALL be stored and later returned exactly as it was sent, without normalization: no reformatting of numbers and no rewriting of URLs.
-
-#### Scenario: Minimum value keeps its formatting
-- **WHEN** an admin creates a default config with `min_value` `"0.10"`
-- **THEN** reading the config back returns `min_value` `"0.10"`
-
-#### Scenario: Relay URL keeps its trailing slash
-- **WHEN** an admin creates a default config with a relay at `"https://relay.example.invalid/"`
-- **THEN** the execution config served for it lists that relay under the key `"https://relay.example.invalid/"`

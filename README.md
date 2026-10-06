@@ -140,7 +140,7 @@ Tokens are stored in the database. On first startup, a default token is auto-gen
 | GET | `/api/admin/vouch/configs/default` | List default configs |
 | POST | `/api/admin/vouch/configs/default` | Create default config |
 | GET | `/api/admin/vouch/configs/default/{name}` | Get default config |
-| PUT | `/api/admin/vouch/configs/default/{name}` | Update default config |
+| PUT | `/api/admin/vouch/configs/default/{name}` | Replace default config |
 | DELETE | `/api/admin/vouch/configs/default/{name}` | Delete default config |
 
 #### Vouch - Proposers
@@ -149,7 +149,7 @@ Tokens are stored in the database. On first startup, a default token is auto-gen
 |--------|----------|-------------|
 | GET | `/api/admin/vouch/proposers` | List proposers |
 | GET | `/api/admin/vouch/proposers/{public_key}` | Get proposer |
-| PUT | `/api/admin/vouch/proposers/{public_key}` | Create/update proposer |
+| PUT | `/api/admin/vouch/proposers/{public_key}` | Create or replace proposer |
 | DELETE | `/api/admin/vouch/proposers/{public_key}` | Delete proposer |
 
 #### Vouch - Proposer Patterns
@@ -159,7 +159,7 @@ Tokens are stored in the database. On first startup, a default token is auto-gen
 | GET | `/api/admin/vouch/proposer-patterns` | List patterns |
 | POST | `/api/admin/vouch/proposer-patterns` | Create pattern |
 | GET | `/api/admin/vouch/proposer-patterns/{name}` | Get pattern |
-| PUT | `/api/admin/vouch/proposer-patterns/{name}` | Update pattern |
+| PUT | `/api/admin/vouch/proposer-patterns/{name}` | Replace pattern |
 | DELETE | `/api/admin/vouch/proposer-patterns/{name}` | Delete pattern |
 
 #### Commit-Boost - Mux Configs
@@ -169,7 +169,7 @@ Tokens are stored in the database. On first startup, a default token is auto-gen
 | GET | `/api/admin/commit-boost/mux` | List mux configs |
 | POST | `/api/admin/commit-boost/mux` | Create mux config |
 | GET | `/api/admin/commit-boost/mux/{name}` | Get mux config |
-| PUT | `/api/admin/commit-boost/mux/{name}` | Update mux config |
+| PUT | `/api/admin/commit-boost/mux/{name}` | Replace mux config keys |
 | DELETE | `/api/admin/commit-boost/mux/{name}` | Delete mux config |
 | POST | `/api/admin/commit-boost/mux/{name}/keys` | Add keys to mux |
 | DELETE | `/api/admin/commit-boost/mux/{name}/keys` | Remove keys from mux |
@@ -216,7 +216,44 @@ Values are stored as sent, without normalization.
 
 ### List filters
 
-Vouch list endpoints accept a query parameter per field, combined with AND: prefix match for names, public keys and relay URLs; substring match for `pattern`; exact match for everything else; `tag` matches patterns that carry that tag; `relay_*` filters match configs that have at least one such relay. They paginate with `limit` (default 100) and `offset`.
+Vouch list endpoints accept a query parameter per field, combined with AND: prefix match for names, public keys and relay URLs; substring match for `pattern`; exact match for everything else; `tag` matches patterns that carry that tag; `relay_*` filters match configs that have at least one such relay.
+
+### Pagination
+
+All admin lists (proposers, default configs, proposer patterns, mux configs) use keyset pagination: `limit` (1–1000, default 100) and an opaque `after` cursor. The response is
+
+```json
+{ "items": [ ... ], "next_cursor": "..." }
+```
+
+Pass `next_cursor` as `after` to get the next page; it is absent on the last page. Items are ordered by identifier (public key for proposers, name otherwise), so a walk visits every item exactly once even while others are being added. There is no total count.
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" "http://localhost:3000/api/admin/vouch/proposers?limit=1000"
+curl -H "Authorization: Bearer $TOKEN" "http://localhost:3000/api/admin/vouch/proposers?limit=1000&after=<next_cursor>"
+```
+
+### Updates replace
+
+`PUT` replaces the whole resource. Omitted optional fields are cleared, an omitted `relays` removes all relays, an omitted `tags` empties them, and `active` / `reset_relays` fall back to `true` / `false`. To change one field, read the resource, modify it, and `PUT` it back in full.
+
+Proposer keys in the path may be sent in either hex case; they are stored and returned in lower case, the form Vouch sends.
+
+### Errors
+
+Every error response, including unknown routes, has the body `{"error": {"code": "...", "message": "..."}}`:
+
+| Status | `code` | When |
+|--------|--------|------|
+| 400 | `INVALID_JSON` | body is not valid JSON or not sent as JSON |
+| 400 | `INVALID_DATA` | a field is missing, has the wrong type or an invalid value (including keys and addresses), or a path parameter is invalid |
+| 400 | `INVALID_QUERY` | a query parameter cannot be parsed or is out of range |
+| 401 | `UNAUTHORIZED` | missing or invalid admin token |
+| 404 | `NOT_FOUND` | unknown resource or route |
+| 405 | `METHOD_NOT_ALLOWED` | method not supported on the route |
+| 409 | `CONFLICT` | creating a default config, pattern or mux config whose name exists |
+| 413 | `PAYLOAD_TOO_LARGE` | body over the limit: 10 MB for the execution-config endpoint (about 100,000 keys), 2 MB elsewhere |
+| 500 | `INTERNAL_ERROR` | unexpected failure |
 
 ## Usage Examples
 

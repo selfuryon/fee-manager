@@ -3,16 +3,13 @@ use crate::AppState;
 use crate::audit::{AuditAction, AuditChanges, RequestContext, ResourceType};
 use crate::audit_log;
 use crate::errors::ApiError;
+use crate::extract::{AppJson, AppPath, AppQuery};
+use crate::pagination::{ListResponse, check_limit};
 use crate::schema::{
-    CreateProposerPatternRequest, PaginatedResponse, ProposerPatternListItem,
-    ProposerPatternResponse, ProposerRelayConfig, UpdateProposerPatternRequest,
+    CreateProposerPatternRequest, ProposerPatternListItem, ProposerPatternResponse,
+    ProposerRelayConfig, UpdateProposerPatternRequest,
 };
-use axum::{
-    Json,
-    extract::{Path, Query, State},
-    http::StatusCode,
-    response::IntoResponse,
-};
+use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
 use serde::Deserialize;
 use sqlx::{Postgres, QueryBuilder};
 use std::collections::HashMap;
@@ -21,6 +18,7 @@ use tracing::{info, instrument};
 use utoipa::IntoParams;
 
 #[derive(Debug, Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
 pub struct ProposerPatternFilters {
     pub name: Option<String>,
     pub pattern: Option<String>,
@@ -35,14 +33,11 @@ pub struct ProposerPatternFilters {
     pub relay_min_value: Option<String>,
     /// Filter by relay disabled status
     pub relay_disabled: Option<bool>,
-    #[serde(default = "default_limit")]
+    /// Maximum number of items to return (1-1000, default 100)
+    #[serde(default = "crate::pagination::default_limit")]
     pub limit: i64,
-    #[serde(default)]
-    pub offset: i64,
-}
-
-fn default_limit() -> i64 {
-    100
+    /// Opaque cursor: the `next_cursor` of the previous page
+    pub after: Option<String>,
 }
 
 /// Appends the WHERE clause for `filters`; every value is a bind parameter.
@@ -95,7 +90,7 @@ fn push_filters(qb: &mut QueryBuilder<Postgres>, filters: &ProposerPatternFilter
     path = "/api/admin/vouch/proposer-patterns",
     params(ProposerPatternFilters),
     responses(
-        (status = 200, description = "List of proposer patterns", body = PaginatedResponse<ProposerPatternListItem>)
+        (status = 200, description = "List of proposer patterns", body = ListResponse<ProposerPatternListItem>)
     ),
     tag = "Vouch - Proposer Patterns",
     security(("bearer_auth" = []))
@@ -103,27 +98,23 @@ fn push_filters(qb: &mut QueryBuilder<Postgres>, filters: &ProposerPatternFilter
 #[instrument(skip(state))]
 pub async fn list_proposer_patterns(
     State(state): State<Arc<AppState>>,
-    Query(filters): Query<ProposerPatternFilters>,
-) -> Result<Json<PaginatedResponse<ProposerPatternListItem>>, ApiError> {
+    AppQuery(filters): AppQuery<ProposerPatternFilters>,
+) -> Result<Json<ListResponse<ProposerPatternListItem>>, ApiError> {
     info!("Listing proposer patterns with filters: {:?}", filters);
 
-    let mut count_query = QueryBuilder::new("SELECT COUNT(*) FROM vouch_proposer_patterns p");
-    push_filters(&mut count_query, &filters);
-    let total: i64 = count_query
-        .build_query_scalar()
-        .fetch_one(&state.pool)
-        .await?;
+    check_limit(filters.limit)?;
 
     let mut data_query = QueryBuilder::new(
         "SELECT p.name, p.pattern, p.tags, p.fee_recipient, p.gas_limit, p.min_value, p.reset_relays, p.created_at, p.updated_at
          FROM vouch_proposer_patterns p",
     );
     push_filters(&mut data_query, &filters);
+    if let Some(ref after) = filters.after {
+        data_query.push(" AND p.name > ").push_bind(after.clone());
+    }
     data_query
-        .push(" ORDER BY p.name ASC LIMIT ")
-        .push_bind(filters.limit)
-        .push(" OFFSET ")
-        .push_bind(filters.offset);
+        .push(" ORDER BY p.name LIMIT ")
+        .push_bind(filters.limit);
 
     let patterns = data_query
         .build_query_as::<crate::models::VouchProposerPattern>()
@@ -132,12 +123,9 @@ pub async fn list_proposer_patterns(
 
     let data: Vec<ProposerPatternListItem> = patterns.into_iter().map(Into::into).collect();
 
-    Ok(Json(PaginatedResponse {
-        data,
-        total,
-        limit: filters.limit,
-        offset: filters.offset,
-    }))
+    Ok(Json(ListResponse::new(data, filters.limit, |item| {
+        item.name.to_string()
+    })))
 }
 
 #[utoipa::path(
@@ -156,7 +144,7 @@ pub async fn list_proposer_patterns(
 #[instrument(skip(state))]
 pub async fn get_proposer_pattern(
     State(state): State<Arc<AppState>>,
-    Path(name): Path<String>,
+    AppPath(name): AppPath<String>,
 ) -> Result<Json<ProposerPatternResponse>, ApiError> {
     info!("Getting proposer pattern: {}", name);
 
@@ -216,7 +204,7 @@ pub async fn get_proposer_pattern(
 pub async fn create_proposer_pattern(
     State(state): State<Arc<AppState>>,
     ctx: RequestContext,
-    Json(req): Json<CreateProposerPatternRequest>,
+    AppJson(req): AppJson<CreateProposerPatternRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
     info!("Creating proposer pattern: {}", req.name);
 
@@ -233,7 +221,7 @@ pub async fn create_proposer_pattern(
     .await?;
 
     if existing > 0 {
-        return Err(ApiError::InvalidData(format!(
+        return Err(ApiError::Conflict(format!(
             "Pattern '{}' already exists",
             req.name
         )));
@@ -356,8 +344,8 @@ pub async fn create_proposer_pattern(
 pub async fn update_proposer_pattern(
     State(state): State<Arc<AppState>>,
     ctx: RequestContext,
-    Path(name): Path<String>,
-    Json(req): Json<UpdateProposerPatternRequest>,
+    AppPath(name): AppPath<String>,
+    AppJson(req): AppJson<UpdateProposerPatternRequest>,
 ) -> Result<Json<ProposerPatternResponse>, ApiError> {
     info!("Updating proposer pattern: {}", name);
 
@@ -380,43 +368,30 @@ pub async fn update_proposer_pattern(
         )));
     }
 
-    // Omitted fields keep their current value
-    let has_updates = req.pattern.is_some()
-        || req.tags.is_some()
-        || req.fee_recipient.is_some()
-        || req.gas_limit.is_some()
-        || req.min_value.is_some()
-        || req.reset_relays.is_some();
+    // Full replacement: every column comes from the request, and the relay
+    // set is replaced by the request's (none when omitted)
+    sqlx::query(
+        "UPDATE vouch_proposer_patterns
+         SET pattern = $2, tags = $3, fee_recipient = $4, gas_limit = $5,
+             min_value = $6, reset_relays = $7
+         WHERE name = $1",
+    )
+    .bind(&name)
+    .bind(&req.pattern)
+    .bind(&req.tags)
+    .bind(&req.fee_recipient)
+    .bind(&req.gas_limit)
+    .bind(&req.min_value)
+    .bind(req.reset_relays)
+    .execute(&mut *tx)
+    .await?;
 
-    if has_updates {
-        sqlx::query(
-            "UPDATE vouch_proposer_patterns SET
-                pattern = COALESCE($2, pattern),
-                tags = COALESCE($3, tags),
-                fee_recipient = COALESCE($4, fee_recipient),
-                gas_limit = COALESCE($5, gas_limit),
-                min_value = COALESCE($6, min_value),
-                reset_relays = COALESCE($7, reset_relays)
-             WHERE name = $1",
-        )
+    sqlx::query("DELETE FROM vouch_proposer_pattern_relays WHERE pattern_name = $1")
         .bind(&name)
-        .bind(&req.pattern)
-        .bind(&req.tags)
-        .bind(&req.fee_recipient)
-        .bind(&req.gas_limit)
-        .bind(&req.min_value)
-        .bind(req.reset_relays)
         .execute(&mut *tx)
         .await?;
-    }
 
-    // Handle relays if provided
     if let Some(relays) = &req.relays {
-        sqlx::query("DELETE FROM vouch_proposer_pattern_relays WHERE pattern_name = $1")
-            .bind(&name)
-            .execute(&mut *tx)
-            .await?;
-
         for (url, relay) in relays {
             sqlx::query(
                 "INSERT INTO vouch_proposer_pattern_relays
@@ -440,12 +415,12 @@ pub async fn update_proposer_pattern(
     // Audit log
     if state.config.audit_enabled {
         let changes = AuditChanges {
-            pattern: req.pattern.clone(),
-            tags: req.tags.clone(),
+            pattern: Some(req.pattern.clone()),
+            tags: Some(req.tags.clone()),
             fee_recipient: req.fee_recipient.as_ref().map(|a| a.to_string()),
             min_value: req.min_value.clone(),
             gas_limit: req.gas_limit.clone(),
-            reset_relays: req.reset_relays,
+            reset_relays: Some(req.reset_relays),
             relays_count: req.relays.as_ref().map(|r| r.len()),
             ..Default::default()
         };
@@ -515,7 +490,7 @@ pub async fn update_proposer_pattern(
 pub async fn delete_proposer_pattern(
     State(state): State<Arc<AppState>>,
     ctx: RequestContext,
-    Path(name): Path<String>,
+    AppPath(name): AppPath<String>,
 ) -> Result<impl IntoResponse, ApiError> {
     info!("Deleting proposer pattern: {}", name);
 
